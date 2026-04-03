@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:unisharesync_mobile_app/features/auth/login_screen.dart';
 
 class OnboardingSlideData {
   final String title;
@@ -68,8 +69,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _finishOnboarding() {
-    // TODO: Navigate to Login or Dashboard and save onboarding state matching your router
-    // e.g., Navigator.pushReplacementNamed(context, '/login');
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => const SignInScreen()),
+    );
   }
 
   @override
