@@ -1,6 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:unisharesync_mobile_app/data/models/user_role.dart';
 import 'package:unisharesync_mobile_app/features/auth/legal_documents_screen.dart';
+import 'package:unisharesync_mobile_app/features/auth/verify_signup_otp_screen.dart';
+import 'package:unisharesync_mobile_app/services/auth_service.dart';
 
 enum AccountRole { student, faculty }
 
@@ -14,6 +17,7 @@ class SignUpScreen extends StatefulWidget {
 class _SignUpScreenState extends State<SignUpScreen> {
   static const String _logoAsset = 'lib/assets/logos/unisharesync.png';
 
+  final _authService = AuthService();
   final _formKey = GlobalKey<FormState>();
 
   final _fullNameController = TextEditingController();
@@ -28,6 +32,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _obscureConfirmPassword = true;
   bool _acceptedTerms = false;
   bool _isSubmitting = false;
+  _PasswordCriteria _passwordCriteria = const _PasswordCriteria();
 
   String? _selectedDepartment;
   String? _selectedSemester;
@@ -75,6 +80,48 @@ class _SignUpScreenState extends State<SignUpScreen> {
     return pattern.hasMatch(value);
   }
 
+  String? _validateStrongPassword(String? value) {
+    final password = value ?? '';
+    final criteria = _evaluatePassword(password);
+
+    if (password.isEmpty) {
+      return 'Password is required';
+    }
+    if (!criteria.hasMinimumLength) {
+      return 'Password must be at least 6 characters';
+    }
+    if (!criteria.hasLowercase) {
+      return 'Use at least one lowercase letter';
+    }
+    if (!criteria.hasUppercase) {
+      return 'Use at least one uppercase letter';
+    }
+    if (!criteria.hasDigit) {
+      return 'Use at least one number';
+    }
+    if (!criteria.hasSymbol) {
+      return 'Use at least one special character';
+    }
+
+    return null;
+  }
+
+  _PasswordCriteria _evaluatePassword(String password) {
+    return _PasswordCriteria(
+      hasMinimumLength: password.length >= 6,
+      hasLowercase: RegExp(r'[a-z]').hasMatch(password),
+      hasUppercase: RegExp(r'[A-Z]').hasMatch(password),
+      hasDigit: RegExp(r'[0-9]').hasMatch(password),
+      hasSymbol: RegExp(r'[^A-Za-z0-9]').hasMatch(password),
+    );
+  }
+
+  void _onPasswordChanged(String password) {
+    setState(() {
+      _passwordCriteria = _evaluatePassword(password);
+    });
+  }
+
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
     final isValid = _formKey.currentState?.validate() ?? false;
@@ -96,7 +143,46 @@ class _SignUpScreenState extends State<SignUpScreen> {
       _isSubmitting = true;
     });
 
-    await Future<void>.delayed(const Duration(milliseconds: 700));
+    try {
+      final role = _role == AccountRole.faculty ? UserRole.faculty : UserRole.student;
+
+      await _authService.signUp(
+        SignUpPayload(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          fullName: _fullNameController.text.trim(),
+          role: role,
+          department: _selectedDepartment,
+          studentId: _role == AccountRole.student
+              ? _studentIdController.text.trim()
+              : null,
+          semester: _role == AccountRole.student ? _selectedSemester : null,
+          designation: _role == AccountRole.faculty
+              ? _designationController.text.trim()
+              : null,
+        ),
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => VerifySignupOtpScreen(
+            email: _emailController.text.trim(),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sign-up failed: $error')),
+      );
+    }
 
     if (!mounted) {
       return;
@@ -106,11 +192,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
       _isSubmitting = false;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Registration UI is ready. Connect backend next.'),
-      ),
-    );
   }
 
   @override
@@ -392,6 +473,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                           hintText: '••••••••',
                                           controller: _passwordController,
                                           prefixIcon: Icons.lock_outline_rounded,
+                                          helperText:
+                                              'Use 6+ characters with uppercase, lowercase, number, and special character.',
+                                          onChanged: _onPasswordChanged,
                                           obscureText: _obscurePassword,
                                           suffixIcon: IconButton(
                                             onPressed: () {
@@ -406,17 +490,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                               color: Colors.grey.shade500,
                                             ),
                                           ),
-                                          validator: (value) {
-                                            final v = value ?? '';
-                                            if (v.isEmpty) {
-                                              return 'Password is required';
-                                            }
-                                            if (v.length < 6) {
-                                              return 'Password must be at least 6 characters';
-                                            }
-                                            return null;
-                                          },
+                                          validator: _validateStrongPassword,
                                         ),
+                                        if (_passwordController.text.trim().isNotEmpty) ...[
+                                          const SizedBox(height: 8),
+                                          _PasswordStrengthIndicator(criteria: _passwordCriteria),
+                                        ],
                                         const SizedBox(height: 14),
                                         _AuthInput(
                                           label: 'Confirm Password',
@@ -451,72 +530,75 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                     );
                                   }
 
-                                  return Row(
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Expanded(
-                                        child: _AuthInput(
-                                          label: 'Password',
-                                          hintText: '••••••••',
-                                          controller: _passwordController,
-                                          prefixIcon: Icons.lock_outline_rounded,
-                                          obscureText: _obscurePassword,
-                                          suffixIcon: IconButton(
-                                            onPressed: () {
-                                              setState(() {
-                                                _obscurePassword = !_obscurePassword;
-                                              });
-                                            },
-                                            icon: Icon(
-                                              _obscurePassword
-                                                  ? Icons.visibility_rounded
-                                                  : Icons.visibility_off_rounded,
-                                              color: Colors.grey.shade500,
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: _AuthInput(
+                                              label: 'Password',
+                                              hintText: '••••••••',
+                                              controller: _passwordController,
+                                              prefixIcon: Icons.lock_outline_rounded,
+                                              helperText:
+                                                  'Use 6+ characters with uppercase, lowercase, number, and special character.',
+                                              onChanged: _onPasswordChanged,
+                                              obscureText: _obscurePassword,
+                                              suffixIcon: IconButton(
+                                                onPressed: () {
+                                                  setState(() {
+                                                    _obscurePassword = !_obscurePassword;
+                                                  });
+                                                },
+                                                icon: Icon(
+                                                  _obscurePassword
+                                                      ? Icons.visibility_rounded
+                                                      : Icons.visibility_off_rounded,
+                                                  color: Colors.grey.shade500,
+                                                ),
+                                              ),
+                                              validator: _validateStrongPassword,
                                             ),
                                           ),
-                                          validator: (value) {
-                                            final v = value ?? '';
-                                            if (v.isEmpty) {
-                                              return 'Password is required';
-                                            }
-                                            if (v.length < 6) {
-                                              return 'Min 6 characters';
-                                            }
-                                            return null;
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: _AuthInput(
-                                          label: 'Confirm Password',
-                                          hintText: '••••••••',
-                                          controller: _confirmPasswordController,
-                                          prefixIcon: Icons.lock_outline_rounded,
-                                          obscureText: _obscureConfirmPassword,
-                                          suffixIcon: IconButton(
-                                            onPressed: () {
-                                              setState(() {
-                                                _obscureConfirmPassword = !_obscureConfirmPassword;
-                                              });
-                                            },
-                                            icon: Icon(
-                                              _obscureConfirmPassword
-                                                  ? Icons.visibility_rounded
-                                                  : Icons.visibility_off_rounded,
-                                              color: Colors.grey.shade500,
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: _AuthInput(
+                                              label: 'Confirm Password',
+                                              hintText: '••••••••',
+                                              controller: _confirmPasswordController,
+                                              prefixIcon: Icons.lock_outline_rounded,
+                                              obscureText: _obscureConfirmPassword,
+                                              suffixIcon: IconButton(
+                                                onPressed: () {
+                                                  setState(() {
+                                                    _obscureConfirmPassword = !_obscureConfirmPassword;
+                                                  });
+                                                },
+                                                icon: Icon(
+                                                  _obscureConfirmPassword
+                                                      ? Icons.visibility_rounded
+                                                      : Icons.visibility_off_rounded,
+                                                  color: Colors.grey.shade500,
+                                                ),
+                                              ),
+                                              validator: (value) {
+                                                if ((value ?? '').isEmpty) {
+                                                  return 'Confirm required';
+                                                }
+                                                if (value != _passwordController.text) {
+                                                  return 'Mismatch';
+                                                }
+                                                return null;
+                                              },
                                             ),
                                           ),
-                                          validator: (value) {
-                                            if ((value ?? '').isEmpty) {
-                                              return 'Confirm required';
-                                            }
-                                            if (value != _passwordController.text) {
-                                              return 'Mismatch';
-                                            }
-                                            return null;
-                                          },
-                                        ),
+                                        ],
                                       ),
+                                      if (_passwordController.text.trim().isNotEmpty) ...[
+                                        const SizedBox(height: 8),
+                                        _PasswordStrengthIndicator(criteria: _passwordCriteria),
+                                      ],
                                     ],
                                   );
                                 },
@@ -741,6 +823,8 @@ class _AuthInput extends StatelessWidget {
     this.keyboardType,
     this.obscureText = false,
     this.suffixIcon,
+    this.helperText,
+    this.onChanged,
   });
 
   final String label;
@@ -751,6 +835,8 @@ class _AuthInput extends StatelessWidget {
   final TextInputType? keyboardType;
   final bool obscureText;
   final Widget? suffixIcon;
+  final String? helperText;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -770,12 +856,21 @@ class _AuthInput extends StatelessWidget {
           keyboardType: keyboardType,
           obscureText: obscureText,
           validator: validator,
+          onChanged: onChanged,
           style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
           decoration: InputDecoration(
             hintText: hintText,
             hintStyle: TextStyle(color: Colors.grey.shade400),
             prefixIcon: Icon(prefixIcon, color: Colors.grey.shade500),
             suffixIcon: suffixIcon,
+            helperText: helperText,
+            helperMaxLines: 2,
+            helperStyle: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              height: 1.35,
+            ),
             filled: true,
             fillColor: Colors.white.withOpacity(0.72),
             border: OutlineInputBorder(
@@ -803,6 +898,127 @@ class _AuthInput extends StatelessWidget {
       ],
     );
   }
+}
+
+class _PasswordStrengthIndicator extends StatelessWidget {
+  const _PasswordStrengthIndicator({
+    required this.criteria,
+  });
+
+  final _PasswordCriteria criteria;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      ('At least 6 characters', criteria.hasMinimumLength),
+      ('Lowercase letter', criteria.hasLowercase),
+      ('Uppercase letter', criteria.hasUppercase),
+      ('Number', criteria.hasDigit),
+      ('Special character', criteria.hasSymbol),
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.58),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF4F9EFF).withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Password Requirements',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${criteria.score}/5',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF2B5B94).withOpacity(0.9),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          LinearProgressIndicator(
+            value: criteria.score / 5,
+            minHeight: 6,
+            backgroundColor: Colors.grey.shade300,
+            valueColor: AlwaysStoppedAnimation<Color>(
+              criteria.score < 2
+                  ? Colors.red
+                  : criteria.score < 4
+                      ? Colors.orange
+                      : Colors.green,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: items.map((item) {
+              final label = item.$1;
+              final isMet = item.$2;
+
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isMet ? Icons.check_circle : Icons.radio_button_unchecked,
+                    size: 14,
+                    color: isMet ? Colors.green : Colors.grey.shade500,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isMet ? Colors.green.shade700 : Colors.grey.shade700,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PasswordCriteria {
+  const _PasswordCriteria({
+    this.hasMinimumLength = false,
+    this.hasLowercase = false,
+    this.hasUppercase = false,
+    this.hasDigit = false,
+    this.hasSymbol = false,
+  });
+
+  final bool hasMinimumLength;
+  final bool hasLowercase;
+  final bool hasUppercase;
+  final bool hasDigit;
+  final bool hasSymbol;
+
+  int get score => [
+        hasMinimumLength,
+        hasLowercase,
+        hasUppercase,
+        hasDigit,
+        hasSymbol,
+      ].where((item) => item).length;
 }
 
 class _DropdownField extends StatelessWidget {
