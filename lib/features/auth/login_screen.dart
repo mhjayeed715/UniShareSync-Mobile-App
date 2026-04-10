@@ -1,7 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:unisharesync_mobile_app/core/config/app_secrets.dart';
 import 'package:unisharesync_mobile_app/features/auth/legal_documents_screen.dart';
+import 'package:unisharesync_mobile_app/features/auth/password_reset_screen.dart';
 import 'package:unisharesync_mobile_app/features/auth/signup_screen.dart';
+import 'package:unisharesync_mobile_app/features/dashboard/role_home_screen.dart';
+import 'package:unisharesync_mobile_app/services/auth_service.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -13,6 +17,7 @@ class SignInScreen extends StatefulWidget {
 class _SignInScreenState extends State<SignInScreen> {
   static const String _logoAsset = 'lib/assets/logos/unisharesync.png';
 
+  final _authService = AuthService();
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -29,6 +34,10 @@ class _SignInScreenState extends State<SignInScreen> {
 
   bool _isUniversityEmail(String email) {
     final value = email.trim().toLowerCase();
+    if (value == AppSecrets.fixedAdminEmail.toLowerCase()) {
+      return true;
+    }
+
     final universityPattern = RegExp(
       r'^[a-z]+(?:\.[a-z]+)*(?:\.\d+)?@[a-z][a-z0-9-]*\.ac\.bd$',
     );
@@ -36,6 +45,8 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   Future<void> _signIn() async {
+    FocusScope.of(context).unfocus();
+
     final isValid = _formKey.currentState?.validate() ?? false;
     if (!isValid) {
       return;
@@ -45,7 +56,34 @@ class _SignInScreenState extends State<SignInScreen> {
       _isSubmitting = true;
     });
 
-    await Future<void>.delayed(const Duration(milliseconds: 600));
+    try {
+      final session = await _authService.signInWithPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => RoleHomeScreen(
+            initialRole: session.role,
+            isLocalAdmin: session.isLocalAdmin,
+          ),
+        ),
+        (route) => false,
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sign-in failed: $error')),
+      );
+    }
 
     if (!mounted) {
       return;
@@ -55,11 +93,6 @@ class _SignInScreenState extends State<SignInScreen> {
       _isSubmitting = false;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Sign-in action is ready. Connect your auth service next.'),
-      ),
-    );
   }
 
   @override
@@ -239,6 +272,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 20),
+                                const SizedBox(height: 6),
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 12,
@@ -262,7 +296,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
-                                          'Only university email format is accepted: studentname(.id optional)@universityname.ac.bd',
+                                          'Use your registered university email. Student and faculty both sign in here.',
                                           style: TextStyle(
                                             fontSize: 12,
                                             height: 1.35,
@@ -341,7 +375,15 @@ class _SignInScreenState extends State<SignInScreen> {
                                 Align(
                                   alignment: Alignment.centerRight,
                                   child: TextButton(
-                                    onPressed: () {},
+                                    onPressed: () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => PasswordResetScreen(
+                                            prefilledEmail: _emailController.text.trim(),
+                                          ),
+                                        ),
+                                      );
+                                    },
                                     child: const Text(
                                       'Forgot Password?',
                                       style: TextStyle(
