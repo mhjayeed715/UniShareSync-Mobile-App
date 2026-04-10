@@ -1,7 +1,9 @@
 import 'dart:ui';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:unisharesync_mobile_app/features/dashboard/role_home_screen.dart';
 import 'package:unisharesync_mobile_app/features/onboarding/onboarding_screen.dart';
+import 'package:unisharesync_mobile_app/services/auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -15,6 +17,7 @@ class _SplashScreenState extends State<SplashScreen>
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+  final _authService = AuthService();
 
   @override
   void initState() {
@@ -40,14 +43,26 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    // Navigate to the next screen after delay
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const OnboardingScreen()),
-        );
-      }
-    });
+    _navigateNext();
+  }
+
+  Future<void> _navigateNext() async {
+    await Future<void>.delayed(const Duration(seconds: 3));
+
+    if (!mounted) {
+      return;
+    }
+
+    final hasSession = await _authService.hasActiveSession();
+    final nextScreen = hasSession ? const RoleHomeScreen() : const OnboardingScreen();
+
+    if (!mounted) {
+      return;
+    }
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => nextScreen),
+    );
   }
 
   @override
