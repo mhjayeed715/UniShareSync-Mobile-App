@@ -5,6 +5,7 @@ import 'package:unisharesync_mobile_app/data/models/profile_model.dart';
 import 'package:unisharesync_mobile_app/data/models/user_role.dart';
 import 'package:unisharesync_mobile_app/features/auth/login_screen.dart';
 import 'package:unisharesync_mobile_app/features/profile/profile_management_screen.dart';
+import 'package:unisharesync_mobile_app/features/resources/resources_tab_view.dart';
 import 'package:unisharesync_mobile_app/services/auth_service.dart';
 
 class AdminHomeScreen extends StatefulWidget {
@@ -200,6 +201,25 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   Future<void> _openAdminModule(_AdminPanelOption option) async {
     if (option.title == 'Profile') {
       await _openProfile();
+      return;
+    }
+
+    if (option.title == 'Resource Screen') {
+      if (_isLocalAdmin) {
+        _showSnackBar(
+          'Local admin mode has no backend session. Use a Supabase admin account to manage resources.',
+        );
+        return;
+      }
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ResourcesStandaloneScreen(
+            currentRole: UserRole.admin,
+            isLocalAdmin: _isLocalAdmin,
+          ),
+        ),
+      );
       return;
     }
 

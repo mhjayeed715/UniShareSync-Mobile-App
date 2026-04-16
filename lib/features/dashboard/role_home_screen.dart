@@ -8,6 +8,7 @@ import 'package:unisharesync_mobile_app/data/models/user_role.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_home_screen.dart';
 import 'package:unisharesync_mobile_app/features/auth/login_screen.dart';
 import 'package:unisharesync_mobile_app/features/profile/profile_management_screen.dart';
+import 'package:unisharesync_mobile_app/features/resources/resources_tab_view.dart';
 import 'package:unisharesync_mobile_app/services/auth_service.dart';
 import 'package:unisharesync_mobile_app/services/dashboard_feed_service.dart';
 
@@ -71,6 +72,7 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
   UserRole _role = UserRole.student;
   ProfileModel? _profile;
   _DashboardTab _activeTab = _DashboardTab.home;
+  int _resourcesRefreshTick = 0;
 
   DateTime _now = DateTime.now();
   Timer? _clockTicker;
@@ -276,10 +278,38 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
                           icon: Icons.upload_file_outlined,
                           title: 'Quick Upload Resource',
                           subtitle: 'Upload notes or files in one step.',
-                          onTap: () {
+                          onTap: () async {
                             Navigator.of(context).pop();
+
+                            if (!mounted) {
+                              return;
+                            }
+
+                            if (_isLocalAdmin) {
+                              _showSnackBar(
+                                'Local admin mode has no backend session. Use a Supabase account to upload resources.',
+                              );
+                              return;
+                            }
+
+                            setState(() {
+                              _activeTab = _DashboardTab.resources;
+                            });
+
+                            final uploaded = await showResourceUploadSheet(
+                              context,
+                            );
+
+                            if (!mounted || uploaded == null) {
+                              return;
+                            }
+
+                            setState(() {
+                              _resourcesRefreshTick++;
+                            });
+
                             _showSnackBar(
-                              'Quick upload action triggered. Wire this to your upload screen.',
+                              'Resource upload submitted successfully.',
                             );
                           },
                         ),
@@ -523,60 +553,11 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
   }
 
   Widget _buildResourcesTab() {
-    return Column(
-      key: const PageStorageKey<String>('resources-tab'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 8),
-        const _TabHeader(
-          title: 'Resources',
-          subtitle: 'Real-time feed from resources table',
-        ),
-        const SizedBox(height: 10),
-        Expanded(
-          child: StreamBuilder<List<DashboardFeedItem>>(
-            stream: _resourceStream,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              if (snapshot.hasError) {
-                return _EmptyState(
-                  title: 'Unable to load resources',
-                  subtitle: '${snapshot.error}',
-                );
-              }
-
-              final items = snapshot.data ?? const <DashboardFeedItem>[];
-              if (items.isEmpty) {
-                return const _EmptyState(
-                  title: 'No resources yet',
-                  subtitle:
-                      'Resources will appear here automatically when data is added to your database.',
-                );
-              }
-
-              return ListView.separated(
-                padding: const EdgeInsets.fromLTRB(0, 4, 0, 118),
-                itemCount: items.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final item = items[index];
-                  return _FeedCard(
-                    icon: Icons.import_contacts_rounded,
-                    iconColor: _DashboardPalette.resourcesBlue,
-                    title: item.title,
-                    subtitle: item.subtitle,
-                    trailing: _relativeTime(item.createdAt),
-                    tag: item.category,
-                  );
-                },
-              );
-            },
-          ),
-        ),
-      ],
+    return ResourcesTabView(
+      key: ValueKey<String>('resources-tab-$_resourcesRefreshTick'),
+      currentRole: _role,
+      isLocalAdmin: _isLocalAdmin,
+      refreshTick: _resourcesRefreshTick,
     );
   }
 
