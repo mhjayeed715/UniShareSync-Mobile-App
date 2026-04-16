@@ -1,9 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:unisharesync_mobile_app/core/config/app_secrets.dart';
+import 'package:unisharesync_mobile_app/data/models/user_role.dart';
 import 'package:unisharesync_mobile_app/features/auth/legal_documents_screen.dart';
 import 'package:unisharesync_mobile_app/features/auth/password_reset_screen.dart';
 import 'package:unisharesync_mobile_app/features/auth/signup_screen.dart';
+import 'package:unisharesync_mobile_app/features/admin/admin_home_screen.dart';
 import 'package:unisharesync_mobile_app/features/dashboard/role_home_screen.dart';
 import 'package:unisharesync_mobile_app/services/auth_service.dart';
 
@@ -39,7 +41,7 @@ class _SignInScreenState extends State<SignInScreen> {
     }
 
     final universityPattern = RegExp(
-      r'^[a-z]+(?:\.[a-z]+)*(?:\.\d+)?@[a-z][a-z0-9-]*\.ac\.bd$',
+      r'^[a-z0-9]+(?:\.[a-z0-9]+)*@[a-z][a-z0-9-]*\.ac\.bd$',
     );
     return universityPattern.hasMatch(value);
   }
@@ -66,12 +68,19 @@ class _SignInScreenState extends State<SignInScreen> {
         return;
       }
 
+      final isAdminSession =
+          session.role == UserRole.admin || session.isLocalAdmin;
+
+      final Widget nextScreen = isAdminSession
+          ? AdminHomeScreen(isLocalAdmin: session.isLocalAdmin)
+          : RoleHomeScreen(
+              initialRole: session.role,
+              isLocalAdmin: session.isLocalAdmin,
+            );
+
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-          builder: (_) => RoleHomeScreen(
-            initialRole: session.role,
-            isLocalAdmin: session.isLocalAdmin,
-          ),
+          builder: (_) => nextScreen,
         ),
         (route) => false,
       );
@@ -92,7 +101,6 @@ class _SignInScreenState extends State<SignInScreen> {
     setState(() {
       _isSubmitting = false;
     });
-
   }
 
   @override
@@ -210,7 +218,8 @@ class _SignInScreenState extends State<SignInScreen> {
                           height: 50,
                           fit: BoxFit.contain,
                           errorBuilder: (context, error, stackTrace) =>
-                              const Icon(Icons.image_not_supported_rounded, size: 50),
+                              const Icon(Icons.image_not_supported_rounded,
+                                  size: 50),
                         ),
                       ),
                     ),
@@ -240,7 +249,8 @@ class _SignInScreenState extends State<SignInScreen> {
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF4F9EFF).withOpacity(0.14),
+                                color:
+                                    const Color(0xFF4F9EFF).withOpacity(0.14),
                                 blurRadius: 34,
                                 offset: const Offset(0, 16),
                               ),
@@ -279,14 +289,17 @@ class _SignInScreenState extends State<SignInScreen> {
                                     vertical: 10,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF4F9EFF).withOpacity(0.08),
+                                    color: const Color(0xFF4F9EFF)
+                                        .withOpacity(0.08),
                                     borderRadius: BorderRadius.circular(14),
                                     border: Border.all(
-                                      color: const Color(0xFF4F9EFF).withOpacity(0.2),
+                                      color: const Color(0xFF4F9EFF)
+                                          .withOpacity(0.2),
                                     ),
                                   ),
                                   child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       const Icon(
                                         Icons.verified_user_rounded,
@@ -379,7 +392,8 @@ class _SignInScreenState extends State<SignInScreen> {
                                       Navigator.of(context).push(
                                         MaterialPageRoute(
                                           builder: (_) => PasswordResetScreen(
-                                            prefilledEmail: _emailController.text.trim(),
+                                            prefilledEmail:
+                                                _emailController.text.trim(),
                                           ),
                                         ),
                                       );
@@ -419,7 +433,8 @@ class _SignInScreenState extends State<SignInScreen> {
                         TextButton(
                           onPressed: () {
                             Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const SignUpScreen()),
+                              MaterialPageRoute(
+                                  builder: (_) => const SignUpScreen()),
                             );
                           },
                           child: const Text(
@@ -439,7 +454,8 @@ class _SignInScreenState extends State<SignInScreen> {
                         GestureDetector(
                           onTap: () {
                             Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+                              MaterialPageRoute(
+                                  builder: (_) => const PrivacyPolicyScreen()),
                             );
                           },
                           child: Text(
@@ -454,7 +470,8 @@ class _SignInScreenState extends State<SignInScreen> {
                         GestureDetector(
                           onTap: () {
                             Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const TermsOfServiceScreen()),
+                              MaterialPageRoute(
+                                  builder: (_) => const TermsOfServiceScreen()),
                             );
                           },
                           child: Text(
@@ -516,7 +533,8 @@ class _GlassInput extends StatelessWidget {
         suffixIcon: suffixIcon,
         filled: true,
         fillColor: Colors.white.withOpacity(0.62),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(
