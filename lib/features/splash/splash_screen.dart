@@ -1,6 +1,8 @@
 import 'dart:ui';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:unisharesync_mobile_app/data/models/user_role.dart';
+import 'package:unisharesync_mobile_app/features/admin/admin_home_screen.dart';
 import 'package:unisharesync_mobile_app/features/dashboard/role_home_screen.dart';
 import 'package:unisharesync_mobile_app/features/onboarding/onboarding_screen.dart';
 import 'package:unisharesync_mobile_app/services/auth_service.dart';
@@ -54,7 +56,22 @@ class _SplashScreenState extends State<SplashScreen>
     }
 
     final hasSession = await _authService.hasActiveSession();
-    final nextScreen = hasSession ? const RoleHomeScreen() : const OnboardingScreen();
+    late final Widget nextScreen;
+
+    if (!hasSession) {
+      nextScreen = const OnboardingScreen();
+    } else {
+      final role = await _authService.getCurrentRole();
+      final isLocalAdmin = await _authService.isLocalAdminSession();
+      final isAdminSession = role == UserRole.admin || isLocalAdmin;
+
+      nextScreen = isAdminSession
+          ? AdminHomeScreen(isLocalAdmin: isLocalAdmin)
+          : RoleHomeScreen(
+              initialRole: role,
+              isLocalAdmin: isLocalAdmin,
+            );
+    }
 
     if (!mounted) {
       return;
@@ -157,7 +174,6 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
               ),
             ),
-
             AnimatedBuilder(
               animation: _controller,
               builder: (context, child) {
@@ -207,7 +223,8 @@ class _SplashScreenState extends State<SplashScreen>
                                 borderRadius: BorderRadius.circular(24),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: const Color(0xFF4F9EFF).withOpacity(0.26),
+                                    color: const Color(0xFF4F9EFF)
+                                        .withOpacity(0.26),
                                     blurRadius: 26,
                                     spreadRadius: 0,
                                     offset: const Offset(0, 12),
@@ -216,8 +233,12 @@ class _SplashScreenState extends State<SplashScreen>
                               ),
                               child: ShaderMask(
                                 blendMode: BlendMode.srcIn,
-                                shaderCallback: (bounds) => const LinearGradient(
-                                  colors: [Color(0xFF4F9EFF), Color(0xFF2DD4BF)],
+                                shaderCallback: (bounds) =>
+                                    const LinearGradient(
+                                  colors: [
+                                    Color(0xFF4F9EFF),
+                                    Color(0xFF2DD4BF)
+                                  ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ).createShader(bounds),
@@ -226,7 +247,8 @@ class _SplashScreenState extends State<SplashScreen>
                                   width: 96,
                                   height: 96,
                                   fit: BoxFit.contain,
-                                  errorBuilder: (context, error, stackTrace) => const Icon(
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      const Icon(
                                     Icons.hub_rounded,
                                     size: 96,
                                   ),
@@ -268,7 +290,6 @@ class _SplashScreenState extends State<SplashScreen>
                 ],
               ),
             ),
-
             Positioned(
               bottom: size.height * 0.08,
               child: AnimatedBuilder(
@@ -296,8 +317,6 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 }
-
-
 
 class NewtonsCradleLoader extends StatefulWidget {
   final double size;
@@ -450,4 +469,3 @@ class _NewtonsCradleLoaderState extends State<NewtonsCradleLoader>
     return dot;
   }
 }
-
