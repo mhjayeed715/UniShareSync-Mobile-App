@@ -91,9 +91,11 @@ class AuthService {
     await _localSessionStore.setLocalAdminSignedIn(false);
 
     final profile = await _profileService.getCurrentProfile();
-    final role = profile?.role ?? UserRole.fromString(user.userMetadata?['role']?.toString());
+    final role = profile?.role ??
+        UserRole.fromString(user.userMetadata?['role']?.toString());
 
-    return AuthSessionInfo(role: role, isLocalAdmin: false, profile: profile, user: user);
+    return AuthSessionInfo(
+        role: role, isLocalAdmin: false, profile: profile, user: user);
   }
 
   Future<AuthSessionInfo> signInWithPassword({
@@ -106,6 +108,9 @@ class AuthService {
     final isFixedAdmin =
         normalizedEmail == AppSecrets.fixedAdminEmail.toLowerCase() &&
             normalizedPassword == AppSecrets.fixedAdminPassword;
+    final isFixedFaculty =
+        normalizedEmail == AppSecrets.fixedFacultyEmail.toLowerCase() &&
+            normalizedPassword == AppSecrets.fixedFacultyPassword;
 
     if (isFixedAdmin) {
       try {
@@ -138,6 +143,37 @@ class AuthService {
       }
     }
 
+    if (isFixedFaculty) {
+      try {
+        final authResponse = await _client.auth.signInWithPassword(
+          email: normalizedEmail,
+          password: normalizedPassword,
+        );
+
+        await _localSessionStore.setLocalAdminSignedIn(false);
+
+        await _profileService.ensureProfileForCurrentUser(
+          email: normalizedEmail,
+          fullName: 'Demo Faculty',
+          role: UserRole.faculty,
+          designation: 'Lecturer',
+        );
+
+        final facultyProfile = await _profileService.getCurrentProfile();
+
+        return AuthSessionInfo(
+          role: UserRole.faculty,
+          isLocalAdmin: false,
+          profile: facultyProfile,
+          user: authResponse.user,
+        );
+      } catch (error) {
+        throw StateError(
+          'Demo faculty sign-in failed. Ensure this account exists in Supabase Auth with confirmed email. ($error)',
+        );
+      }
+    }
+
     final authResponse = await _client.auth.signInWithPassword(
       email: normalizedEmail,
       password: normalizedPassword,
@@ -147,7 +183,8 @@ class AuthService {
 
     final profile = await _profileService.getCurrentProfile();
     final resolvedRole = profile?.role ??
-        UserRole.fromString(authResponse.user?.userMetadata?['role']?.toString());
+        UserRole.fromString(
+            authResponse.user?.userMetadata?['role']?.toString());
 
     return AuthSessionInfo(
       role: resolvedRole,
@@ -210,6 +247,11 @@ class AuthService {
 
     if (user.email?.toLowerCase() == AppSecrets.fixedAdminEmail.toLowerCase()) {
       return UserRole.admin;
+    }
+
+    if (user.email?.toLowerCase() ==
+        AppSecrets.fixedFacultyEmail.toLowerCase()) {
+      return UserRole.faculty;
     }
 
     return UserRole.fromString(user.userMetadata?['role']?.toString());

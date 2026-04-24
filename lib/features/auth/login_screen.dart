@@ -36,7 +36,8 @@ class _SignInScreenState extends State<SignInScreen> {
 
   bool _isUniversityEmail(String email) {
     final value = email.trim().toLowerCase();
-    if (value == AppSecrets.fixedAdminEmail.toLowerCase()) {
+    if (value == AppSecrets.fixedAdminEmail.toLowerCase() ||
+        value == AppSecrets.fixedFacultyEmail.toLowerCase()) {
       return true;
     }
 
@@ -309,7 +310,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
-                                          'Use your registered university email. Student and faculty both sign in here.',
+                                          'Use your registered university email.',
                                           style: TextStyle(
                                             fontSize: 12,
                                             height: 1.35,
