@@ -75,7 +75,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _isUniversityEmail(String email) {
     final value = email.trim().toLowerCase();
     final pattern = RegExp(
-      r'^[a-z]+(?:\.[a-z]+)*(?:\.\d+)?@[a-z][a-z0-9-]*\.ac\.bd$',
+      r'^[a-z0-9]+(?:\.[a-z0-9]+)*@[a-z][a-z0-9-]*\.ac\.bd$',
     );
     return pattern.hasMatch(value);
   }
@@ -1054,7 +1054,7 @@ class _DropdownField extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: value,
+          initialValue: value,
           validator: validator,
           dropdownColor: Colors.white,
           isExpanded: true,

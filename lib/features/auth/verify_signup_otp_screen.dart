@@ -456,8 +456,6 @@ class _VerifyTopBar extends StatelessWidget {
         const SizedBox(height: 14),
         Row(
           children: List<Widget>.generate(labels.length, (index) {
-            final isActive = true;
-
             return Expanded(
               child: Padding(
                 padding: EdgeInsets.only(right: index == labels.length - 1 ? 0 : 8),
@@ -467,22 +465,19 @@ class _VerifyTopBar extends StatelessWidget {
                       height: 8,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(100),
-                        gradient: isActive
-                            ? const LinearGradient(
-                                colors: [Color(0xFF4F9EFF), Color(0xFF2DD4BF)],
-                              )
-                            : null,
-                        color: isActive ? null : const Color(0xFFD7E2F0),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF4F9EFF), Color(0xFF2DD4BF)],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       labels[index],
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.4,
-                        color: isActive ? const Color(0xFF2B5B94) : const Color(0xFF8A99AE),
+                        color: Color(0xFF2B5B94),
                       ),
                     ),
                   ],

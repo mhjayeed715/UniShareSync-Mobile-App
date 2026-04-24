@@ -1019,7 +1019,6 @@ class _GlassInput extends StatelessWidget {
     required this.prefixIcon,
     required this.enabled,
     this.keyboardType,
-    this.obscureText = false,
   });
 
   final TextEditingController controller;
@@ -1027,7 +1026,6 @@ class _GlassInput extends StatelessWidget {
   final IconData prefixIcon;
   final bool enabled;
   final TextInputType? keyboardType;
-  final bool obscureText;
 
   @override
   Widget build(BuildContext context) {
@@ -1035,7 +1033,7 @@ class _GlassInput extends StatelessWidget {
       controller: controller,
       enabled: enabled,
       keyboardType: keyboardType,
-      obscureText: obscureText,
+      obscureText: false,
       style: const TextStyle(
         color: Color(0xFF0F172A),
         fontWeight: FontWeight.w600,
