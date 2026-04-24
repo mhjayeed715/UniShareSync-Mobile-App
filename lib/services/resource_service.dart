@@ -84,7 +84,7 @@ class ResourceService {
         .from('resources')
         .insert(payload)
         .select(
-          'id,title,description,original_file_name,course_code,semester_no,resource_type,file_type,drive_url,preview_url,approval_status,total_downloads,uploader_id,uploader_role,created_at',
+          'id,title,description,original_file_name,course_code,semester_no,resource_type,file_type,drive_url,preview_url,approval_status,rejection_reason,total_downloads,uploader_id,uploader_role,created_at',
         )
         .single();
 
@@ -259,6 +259,7 @@ extension on ResourceItem {
       fileType: fileType,
       driveUrl: driveUrl,
       previewUrl: previewUrl,
+      rejectionReason: rejectionReason,
       approvalStatus: approvalStatus,
       totalDownloads: totalDownloads,
       uploaderId: uploaderId,
