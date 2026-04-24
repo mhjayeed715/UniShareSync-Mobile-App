@@ -106,6 +106,18 @@ class _ResourcesTabViewState extends State<ResourcesTabView> {
   }
 
   List<ResourceItem> get _visibleResources {
+    if (!_isAdminView) {
+      final currentUserId = (_resourceService.currentUserId ?? '').trim();
+
+      return _resources
+          .where(
+            (item) =>
+                item.approvalStatus == ResourceApprovalStatus.approved ||
+                (currentUserId.isNotEmpty && item.uploaderId == currentUserId),
+          )
+          .toList(growable: false);
+    }
+
     if (_isAdminView && _pendingOnlyForAdmin) {
       return _resources
           .where(
@@ -292,7 +304,11 @@ class _ResourcesTabViewState extends State<ResourcesTabView> {
       return;
     }
 
-    _showMessage('Resource updated successfully.');
+    _showMessage(
+      item.approvalStatus == ResourceApprovalStatus.rejected
+          ? 'Resource updated and resubmitted for admin review.'
+          : 'Resource updated successfully.',
+    );
     await _refreshResources(showLoader: false);
   }
 
@@ -983,6 +999,27 @@ class _ResourceListCard extends StatelessWidget {
                         ),
                       ],
                     ),
+                    if (item.approvalStatus == ResourceApprovalStatus.rejected &&
+                        (item.rejectionReason ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEE2E2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFFCA5A5)),
+                        ),
+                        child: Text(
+                          'Rejection reason: ${item.rejectionReason!.trim()}',
+                          style: const TextStyle(
+                            color: Color(0xFF991B1B),
+                            fontWeight: FontWeight.w700,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
                     if (canReview) ...[
                       const SizedBox(height: 10),
                       Row(
@@ -1938,6 +1975,21 @@ class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
               _UploaderProfileCard(resource: _resource),
               const SizedBox(height: 12),
               _MetaGrid(resource: _resource),
+              if (_resource.approvalStatus == ResourceApprovalStatus.rejected &&
+                  (_resource.rejectionReason ?? '').trim().isNotEmpty) ...[
+                const SizedBox(height: 14),
+                _SectionCard(
+                  title: 'Rejection Reason',
+                  child: Text(
+                    _resource.rejectionReason!.trim(),
+                    style: const TextStyle(
+                      color: Color(0xFF991B1B),
+                      fontWeight: FontWeight.w700,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 14),
               _SectionCard(
                 title: 'Description',

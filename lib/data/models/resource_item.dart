@@ -187,6 +187,7 @@ class ResourceItem {
     this.description,
     this.originalFileName,
     this.previewUrl,
+    this.rejectionReason,
     this.uploaderAvatarUrl,
   });
 
@@ -201,6 +202,7 @@ class ResourceItem {
   final ResourceFileType fileType;
   final String driveUrl;
   final String? previewUrl;
+  final String? rejectionReason;
   final ResourceApprovalStatus approvalStatus;
   final int totalDownloads;
   final String uploaderId;
@@ -227,6 +229,7 @@ class ResourceItem {
       fileType: ResourceFileType.fromString(map['file_type']?.toString()),
       driveUrl: (map['drive_url'] ?? '').toString(),
       previewUrl: map['preview_url']?.toString(),
+      rejectionReason: map['rejection_reason']?.toString(),
       approvalStatus:
           ResourceApprovalStatus.fromString(map['approval_status']?.toString()),
       totalDownloads: _toInt(map['total_downloads']) ?? 0,
@@ -255,6 +258,7 @@ class ResourceItem {
       fileType: ResourceFileType.fromString(map['file_type']?.toString()),
       driveUrl: (map['drive_url'] ?? '').toString(),
       previewUrl: map['preview_url']?.toString(),
+      rejectionReason: map['rejection_reason']?.toString(),
       approvalStatus:
           ResourceApprovalStatus.fromString(map['approval_status']?.toString()),
       totalDownloads: _toInt(map['total_downloads']) ?? 0,
@@ -271,7 +275,9 @@ class ResourceItem {
     String? title,
     String? description,
     String? originalFileName,
+    String? previewUrl,
     String? driveUrl,
+    String? rejectionReason,
     ResourceApprovalStatus? approvalStatus,
   }) {
     return ResourceItem(
@@ -285,7 +291,8 @@ class ResourceItem {
       resourceType: resourceType,
       fileType: fileType,
       driveUrl: driveUrl ?? this.driveUrl,
-      previewUrl: previewUrl,
+      previewUrl: previewUrl ?? this.previewUrl,
+      rejectionReason: rejectionReason ?? this.rejectionReason,
       approvalStatus: approvalStatus ?? this.approvalStatus,
       totalDownloads: totalDownloads ?? this.totalDownloads,
       uploaderId: uploaderId,
