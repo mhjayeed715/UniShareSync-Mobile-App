@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:unisharesync_mobile_app/data/models/profile_model.dart';
 import 'package:unisharesync_mobile_app/data/models/user_role.dart';
 import 'package:unisharesync_mobile_app/features/auth/login_screen.dart';
+import 'package:unisharesync_mobile_app/features/notice_board/admin_notice_board_screen.dart';
+import 'package:unisharesync_mobile_app/features/admin/admin_projects_screen.dart';
 import 'package:unisharesync_mobile_app/features/profile/profile_management_screen.dart';
 import 'package:unisharesync_mobile_app/features/resources/resources_tab_view.dart';
 import 'package:unisharesync_mobile_app/services/auth_service.dart';
@@ -218,6 +220,24 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             currentRole: UserRole.admin,
             isLocalAdmin: _isLocalAdmin,
           ),
+        ),
+      );
+      return;
+    }
+
+    if (option.title == 'Projects Screen') {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const AdminProjectsScreen(),
+        ),
+      );
+      return;
+    }
+
+    if (option.title == 'Notice Board Screen') {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const AdminNoticeBoardScreen(),
         ),
       );
       return;
