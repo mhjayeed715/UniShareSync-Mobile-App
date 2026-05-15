@@ -6,6 +6,8 @@ import 'package:unisharesync_mobile_app/data/models/user_role.dart';
 import 'package:unisharesync_mobile_app/features/auth/login_screen.dart';
 import 'package:unisharesync_mobile_app/features/notice_board/admin_notice_board_screen.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_projects_screen.dart';
+import 'package:unisharesync_mobile_app/features/admin/admin_events_screen.dart';
+import 'package:unisharesync_mobile_app/features/admin/admin_clubs_screen.dart';
 import 'package:unisharesync_mobile_app/features/profile/profile_management_screen.dart';
 import 'package:unisharesync_mobile_app/features/resources/resources_tab_view.dart';
 import 'package:unisharesync_mobile_app/services/auth_service.dart';
@@ -240,6 +242,41 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           builder: (_) => const AdminNoticeBoardScreen(),
         ),
       );
+      return;
+    }
+
+    if (option.title == 'Events and Clubs Screen') {
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Manage Events & Clubs'),
+          content: const Text('Choose what to manage:'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'events'),
+              child: const Text('Events'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'clubs'),
+              child: const Text('Clubs'),
+            ),
+          ],
+        ),
+      );
+
+      if (choice == 'events') {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const AdminEventsScreen(),
+          ),
+        );
+      } else if (choice == 'clubs') {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const AdminClubsScreen(),
+          ),
+        );
+      }
       return;
     }
 

@@ -7,8 +7,12 @@ import 'package:unisharesync_mobile_app/data/models/profile_model.dart';
 import 'package:unisharesync_mobile_app/data/models/user_role.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_home_screen.dart';
 import 'package:unisharesync_mobile_app/features/auth/login_screen.dart';
+import 'package:unisharesync_mobile_app/features/notice_board/notice_board_screen.dart';
+import 'package:unisharesync_mobile_app/features/notification_center/notification_center_screen.dart';
 import 'package:unisharesync_mobile_app/features/profile/profile_management_screen.dart';
+import 'package:unisharesync_mobile_app/features/projects/projects_screen.dart';
 import 'package:unisharesync_mobile_app/features/resources/resources_tab_view.dart';
+import 'package:unisharesync_mobile_app/features/events_clubs/events_clubs_screen.dart';
 import 'package:unisharesync_mobile_app/services/auth_service.dart';
 import 'package:unisharesync_mobile_app/services/dashboard_feed_service.dart';
 
@@ -78,7 +82,6 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
   Timer? _clockTicker;
 
   late final Stream<List<DashboardFeedItem>> _resourceStream;
-  late final Stream<List<DashboardFeedItem>> _noticeStream;
   late final Stream<List<DashboardFeedItem>> _routineStream;
 
   @override
@@ -87,8 +90,6 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
 
     _resourceStream =
         _dashboardFeedService.watchResources(limit: 30).asBroadcastStream();
-    _noticeStream =
-        _dashboardFeedService.watchNotices(limit: 20).asBroadcastStream();
     _routineStream =
         _dashboardFeedService.watchRoutines(limit: 25).asBroadcastStream();
 
@@ -360,27 +361,18 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
         });
         break;
       case _MenuDestination.noticeBoard:
-        await _openFeatureModule(
-          title: 'Notice Board',
-          subtitle: 'Latest campus-wide notices and announcements.',
-          icon: Icons.campaign_rounded,
-          accentColor: _DashboardPalette.noticesAmber,
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const NoticeBoardScreen()),
         );
         break;
       case _MenuDestination.projects:
-        await _openFeatureModule(
-          title: 'Projects',
-          subtitle: 'Collaborative projects and team spaces.',
-          icon: Icons.account_tree_rounded,
-          accentColor: _DashboardPalette.projectsPurple,
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ProjectsScreen()),
         );
         break;
       case _MenuDestination.eventsAndClubs:
-        await _openFeatureModule(
-          title: 'Events and Clubs',
-          subtitle: 'Discover events, clubs, and participation updates.',
-          icon: Icons.celebration_rounded,
-          accentColor: _DashboardPalette.eventsEmerald,
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const EventsClubsScreen()),
         );
         break;
       case _MenuDestination.lostAndFound:
@@ -532,9 +524,12 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
           greeting: '${_timeGreeting()}, ${_firstName()}',
           subtitle: _subtitleLine(),
           avatarUrl: _profile?.avatarUrl,
-          onNotificationTap: () {
-            _showSnackBar('Notifications integration is ready for live data.');
-          },
+          onNotificationTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const NotificationCenterScreen(),
+            ),
+          ),
         ),
         const SizedBox(height: 14),
         _buildActivityOverviewCard(),
@@ -544,6 +539,21 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
         const _SectionHeader(title: 'Recent Notices'),
         const SizedBox(height: 10),
         _buildNoticesStrip(),
+        const SizedBox(height: 4),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const NoticeBoardScreen()),
+            ),
+            child: const Text('View All Notices →',
+                style: TextStyle(
+                    color: Color(0xFFF59E0B),
+                    fontWeight: FontWeight.w700)),
+          ),
+        ),
         const SizedBox(height: 18),
         const _SectionHeader(title: 'Latest Resources'),
         const SizedBox(height: 10),
@@ -650,74 +660,78 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
   }
 
   Widget _buildActivityOverviewCard() {
-    return StreamBuilder<List<DashboardFeedItem>>(
-      stream: _resourceStream,
-      builder: (context, snapshot) {
-        final items = snapshot.data ?? const <DashboardFeedItem>[];
-        final weekStart = DateTime.now().subtract(const Duration(days: 7));
+    return FutureBuilder<int>(
+      future: _dashboardFeedService.getTotalResourceCount(),
+      builder: (context, totalCountSnapshot) {
+        return StreamBuilder<List<DashboardFeedItem>>(
+          stream: _resourceStream.timeout(
+            const Duration(seconds: 5),
+            onTimeout: (sink) {
+              sink.add(const <DashboardFeedItem>[]);
+            },
+          ),
+          builder: (context, snapshot) {
+            final items = snapshot.data ?? const <DashboardFeedItem>[];
+            final weekStart = DateTime.now().subtract(const Duration(days: 7));
 
-        final weeklyItems = items
-            .where(
-              (item) =>
-                  item.createdAt != null && item.createdAt!.isAfter(weekStart),
-            )
-            .length;
+            final weeklyItems = items
+                .where(
+                  (item) =>
+                      item.createdAt != null && item.createdAt!.isAfter(weekStart),
+                )
+                .length;
 
-        return _GlassCard(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+            final totalResources = totalCountSnapshot.data ?? 0;
+
+            return _GlassCard(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Expanded(
-                    child: Text(
-                      'Activity Overview',
-                      style: TextStyle(
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w700,
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Activity Overview',
+                          style: TextStyle(
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
-                    ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '$weeklyItems this week',
+                          style: const TextStyle(
+                            color: _DashboardPalette.authBlue,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      '$weeklyItems this week',
-                      style: const TextStyle(
-                        color: _DashboardPalette.authBlue,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                      ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Resources available now: $totalResources',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Resources available now: ${items.length}',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'This card updates from live database rows. No mock values are used.',
-                style: TextStyle(
-                  color: Colors.grey.shade700,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -761,10 +775,9 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
                 label: 'Notices',
                 color: _DashboardPalette.noticesAmber,
                 onTap: () {
-                  setState(() {
-                    _activeTab = _DashboardTab.home;
-                  });
-                  _showSnackBar('Notices are shown in the Home section.');
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const NoticeBoardScreen()),
+                  );
                 },
               ),
               _QuickAccessTile(
@@ -772,11 +785,8 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
                 label: 'Projects',
                 color: _DashboardPalette.projectsPurple,
                 onTap: () {
-                  _openFeatureModule(
-                    title: 'Projects',
-                    subtitle: 'Collaborative projects and team spaces.',
-                    icon: Icons.account_tree_rounded,
-                    accentColor: _DashboardPalette.projectsPurple,
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ProjectsScreen()),
                   );
                 },
               ),
@@ -785,11 +795,8 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
                 label: 'Events',
                 color: _DashboardPalette.eventsEmerald,
                 onTap: () {
-                  _openFeatureModule(
-                    title: 'Events',
-                    subtitle: 'Campus events, registration, and schedules.',
-                    icon: Icons.celebration_rounded,
-                    accentColor: _DashboardPalette.eventsEmerald,
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const EventsClubsScreen()),
                   );
                 },
               ),
@@ -827,57 +834,15 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
   }
 
   Widget _buildNoticesStrip() {
-    return SizedBox(
-      height: 150,
-      child: StreamBuilder<List<DashboardFeedItem>>(
-        stream: _noticeStream,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return _GlassCard(
-              child: _CompactMessage(
-                title: 'Unable to load notices',
-                subtitle: '${snapshot.error}',
-              ),
-            );
-          }
-
-          final items = snapshot.data ?? const <DashboardFeedItem>[];
-          if (items.isEmpty) {
-            return const _GlassCard(
-              child: _CompactMessage(
-                title: 'No notices yet',
-                subtitle:
-                    'Notices will appear here in real time when inserted.',
-              ),
-            );
-          }
-
-          return ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: items.length > 10 ? 10 : items.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
-            itemBuilder: (context, index) {
-              final notice = items[index];
-              return _NoticeCard(
-                title: notice.title,
-                subtitle: notice.subtitle,
-                category: notice.category,
-                relativeTime: _relativeTime(notice.createdAt),
-              );
-            },
-          );
-        },
-      ),
-    );
+    return const NoticeDashboardStrip();
   }
 
   Widget _buildResourcePreviewList() {
-    return StreamBuilder<List<DashboardFeedItem>>(
-      stream: _resourceStream,
+    return FutureBuilder<List<DashboardFeedItem>>(
+      future: Future.delayed(
+        const Duration(seconds: 3),
+        () => _dashboardFeedService.watchResources(limit: 30).first,
+      ).catchError((_) => const <DashboardFeedItem>[]),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Padding(
@@ -1342,81 +1307,6 @@ class _FeedCard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _NoticeCard extends StatelessWidget {
-  const _NoticeCard({
-    required this.title,
-    required this.relativeTime,
-    this.subtitle,
-    this.category,
-  });
-
-  final String title;
-  final String relativeTime;
-  final String? subtitle;
-  final String? category;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 268,
-      child: _GlassCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if ((category ?? '').trim().isNotEmpty)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(
-                  color: _DashboardPalette.noticesAmber.withOpacity(0.16),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  category!,
-                  style: const TextStyle(
-                    color: Color(0xFFB45309),
-                    fontWeight: FontWeight.w800,
-                    fontSize: 10.5,
-                  ),
-                ),
-              ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF0F172A),
-              ),
-            ),
-            if ((subtitle ?? '').trim().isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                subtitle!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: Colors.grey.shade700,
-                ),
-              ),
-            ],
-            const Spacer(),
-            Text(
-              relativeTime,
-              style: const TextStyle(
-                color: Color(0xFF64748B),
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

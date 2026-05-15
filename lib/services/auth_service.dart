@@ -65,6 +65,8 @@ class AuthService {
   final LocalSessionStore _localSessionStore;
   final ProfileService _profileService;
 
+  String? get currentUserId => _client.auth.currentUser?.id;
+
   Future<void> signUp(SignUpPayload payload) async {
     await _client.auth.signUp(
       email: payload.email.trim().toLowerCase(),
@@ -111,6 +113,9 @@ class AuthService {
     final isFixedFaculty =
         normalizedEmail == AppSecrets.fixedFacultyEmail.toLowerCase() &&
             normalizedPassword == AppSecrets.fixedFacultyPassword;
+    final isFixedStudent =
+        normalizedEmail == AppSecrets.fixedStudentEmail.toLowerCase() &&
+            normalizedPassword == AppSecrets.fixedStudentPassword;
 
     if (isFixedAdmin) {
       try {
@@ -170,6 +175,39 @@ class AuthService {
       } catch (error) {
         throw StateError(
           'Demo faculty sign-in failed. Ensure this account exists in Supabase Auth with confirmed email. ($error)',
+        );
+      }
+    }
+
+    if (isFixedStudent) {
+      try {
+        final authResponse = await _client.auth.signInWithPassword(
+          email: normalizedEmail,
+          password: normalizedPassword,
+        );
+
+        await _localSessionStore.setLocalAdminSignedIn(false);
+
+        await _profileService.ensureProfileForCurrentUser(
+          email: normalizedEmail,
+          fullName: 'Demo Student',
+          role: UserRole.student,
+          studentId: '223071000',
+          semester: '9',
+          department: 'Computer Science & Engineering',
+        );
+
+        final studentProfile = await _profileService.getCurrentProfile();
+
+        return AuthSessionInfo(
+          role: UserRole.student,
+          isLocalAdmin: false,
+          profile: studentProfile,
+          user: authResponse.user,
+        );
+      } catch (error) {
+        throw StateError(
+          'Demo student sign-in failed. Ensure this account exists in Supabase Auth with confirmed email. ($error)',
         );
       }
     }
@@ -252,6 +290,11 @@ class AuthService {
     if (user.email?.toLowerCase() ==
         AppSecrets.fixedFacultyEmail.toLowerCase()) {
       return UserRole.faculty;
+    }
+
+    if (user.email?.toLowerCase() ==
+        AppSecrets.fixedStudentEmail.toLowerCase()) {
+      return UserRole.student;
     }
 
     return UserRole.fromString(user.userMetadata?['role']?.toString());

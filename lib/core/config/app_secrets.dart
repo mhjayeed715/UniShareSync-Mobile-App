@@ -31,6 +31,16 @@ class AppSecrets {
     defaultValue: 'UniShareSync@Faculty123',
   );
 
+  static const fixedStudentEmail = String.fromEnvironment(
+    'STUDENT_EMAIL',
+    defaultValue: 'student.demo@smuct.ac.bd',
+  );
+
+  static const fixedStudentPassword = String.fromEnvironment(
+    'STUDENT_PASSWORD',
+    defaultValue: 'UniShareSync@Student123',
+  );
+
   static const passwordRecoveryRedirectTo = String.fromEnvironment(
     'PASSWORD_RECOVERY_REDIRECT_TO',
     defaultValue: 'unisharesync://reset-password',

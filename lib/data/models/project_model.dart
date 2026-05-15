@@ -78,6 +78,7 @@ class ProjectModel {
     this.userRole,
     this.hasUserJoined = false,
     this.joinRequestPending = false,
+    this.memberNames = const [],
   });
 
   final String id;
@@ -97,6 +98,7 @@ class ProjectModel {
   final UserRole? userRole;
   final bool hasUserJoined;
   final bool joinRequestPending;
+  final List<String> memberNames;
 
   String get semesterLabel => 'Semester $semesterNo';
 
@@ -133,6 +135,10 @@ class ProjectModel {
       userRole: null,
       hasUserJoined: map['has_user_joined'] as bool? ?? false,
       joinRequestPending: map['join_request_pending'] as bool? ?? false,
+      memberNames: (map['member_names'] as List?)
+              ?.cast<String>()
+              .toList() ??
+          [],
     );
   }
 
@@ -171,6 +177,7 @@ class ProjectModel {
     UserRole? userRole,
     bool? hasUserJoined,
     bool? joinRequestPending,
+    List<String>? memberNames,
   }) {
     return ProjectModel(
       id: id ?? this.id,
@@ -190,6 +197,7 @@ class ProjectModel {
       userRole: userRole ?? this.userRole,
       hasUserJoined: hasUserJoined ?? this.hasUserJoined,
       joinRequestPending: joinRequestPending ?? this.joinRequestPending,
+      memberNames: memberNames ?? this.memberNames,
     );
   }
 }

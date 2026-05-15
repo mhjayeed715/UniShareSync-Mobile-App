@@ -43,7 +43,8 @@ class ProjectsService {
         .map((row) => ProjectModel.fromMap(Map<String, dynamic>.from(row)))
         .toList(growable: false);
 
-    return _applyJoinRequestStatus(projects);
+    final withStatus = await _applyJoinRequestStatus(projects);
+    return _applyMemberNames(withStatus);
   }
 
   Future<List<ProjectModel>> fetchManagedProjects({
@@ -76,9 +77,11 @@ class ProjectsService {
 
     final response = await request.order('created_at', ascending: false);
 
-    return (response as List<dynamic>)
+    final projects = (response as List<dynamic>)
         .map((row) => ProjectModel.fromMap(Map<String, dynamic>.from(row)))
         .toList(growable: false);
+
+    return _applyMemberNames(projects);
   }
 
   Future<ProjectModel> createProject(ProjectDraft draft) async {
@@ -247,6 +250,97 @@ class ProjectsService {
           );
         })
         .toList(growable: false);
+  }
+
+  Future<List<ProjectModel>> _applyMemberNames(
+    List<ProjectModel> projects,
+  ) async {
+    if (projects.isEmpty) return projects;
+
+    final projectIds = projects.map((p) => p.id).toList();
+    print('DEBUG: Fetching members for ${projectIds.length} projects');
+    
+    try {
+      // Fetch project members
+      final membersResponse = await _client
+          .from('project_members')
+          .select('project_id, user_id')
+          .inFilter('project_id', projectIds);
+
+      print('DEBUG: project_members response: $membersResponse');
+      
+      if (membersResponse == null || (membersResponse as List).isEmpty) {
+        print('DEBUG: No members found for any project');
+        return projects;
+      }
+      
+      final userIds = <String>{};
+      final memberProjectMap = <String, List<String>>{};
+      
+      for (final row in membersResponse as List<dynamic>) {
+        final data = Map<String, dynamic>.from(row);
+        final projectId = data['project_id']?.toString();
+        final userId = data['user_id']?.toString();
+        
+        if (projectId != null && userId != null) {
+          userIds.add(userId);
+          memberProjectMap.putIfAbsent(userId, () => []).add(projectId);
+        }
+      }
+
+      print('DEBUG: Found ${userIds.length} unique user IDs');
+      if (userIds.isEmpty) return projects;
+
+      // Fetch profiles - use select with specific columns to avoid RLS issues
+      final profilesResponse = await _client
+          .from('profiles')
+          .select('id, full_name')
+          .inFilter('id', userIds.toList());
+
+      print('DEBUG: profiles response: $profilesResponse');
+      
+      if (profilesResponse == null) {
+        print('DEBUG: Profiles response is null');
+        return projects;
+      }
+      
+      final namesByUserId = <String, String>{};
+      for (final row in profilesResponse as List<dynamic>) {
+        final data = Map<String, dynamic>.from(row);
+        final userId = data['id']?.toString();
+        final name = data['full_name']?.toString();
+        if (userId != null && name != null) {
+          namesByUserId[userId] = name;
+        }
+      }
+
+      print('DEBUG: Found ${namesByUserId.length} profile names');
+      
+      // Map members to projects
+      final membersByProject = <String, List<String>>{};
+      memberProjectMap.forEach((userId, projectIds) {
+        final name = namesByUserId[userId];
+        if (name != null) {
+          for (final projectId in projectIds) {
+            membersByProject.putIfAbsent(projectId, () => []).add(name);
+          }
+        }
+      });
+
+      print('DEBUG: membersByProject: $membersByProject');
+      
+      return projects
+          .map((project) {
+            final members = membersByProject[project.id] ?? [];
+            print('DEBUG: Project ${project.title} has ${members.length} members: $members');
+            return project.copyWith(memberNames: members);
+          })
+          .toList(growable: false);
+    } catch (e, stackTrace) {
+      print('DEBUG: Error fetching member names: $e');
+      print('DEBUG: Stack trace: $stackTrace');
+      return projects;
+    }
   }
 
 }

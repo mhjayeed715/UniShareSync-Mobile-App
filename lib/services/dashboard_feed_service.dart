@@ -20,6 +20,18 @@ class DashboardFeedService {
         );
   }
 
+  Future<int> getTotalResourceCount() async {
+    try {
+      final response = await _client
+          .from('resources')
+          .select('id')
+          .then((data) => data as List);
+      return response.length;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   Stream<List<DashboardFeedItem>> watchNotices({int limit = 15}) {
     return _client
         .from('notices')
