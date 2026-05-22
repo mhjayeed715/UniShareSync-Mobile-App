@@ -14,6 +14,7 @@ import 'package:unisharesync_mobile_app/features/projects/projects_screen.dart';
 import 'package:unisharesync_mobile_app/features/resources/resources_tab_view.dart';
 import 'package:unisharesync_mobile_app/features/events_clubs/events_clubs_screen.dart';
 import 'package:unisharesync_mobile_app/features/lost_found/lost_found_screen.dart';
+import 'package:unisharesync_mobile_app/features/feedback/feedback_screen.dart';
 import 'package:unisharesync_mobile_app/services/auth_service.dart';
 import 'package:unisharesync_mobile_app/services/dashboard_feed_service.dart';
 
@@ -387,11 +388,13 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
         );
         break;
       case _MenuDestination.feedback:
-        await _openFeatureModule(
-          title: 'Feedback',
-          subtitle: 'Share feedback and report issues for improvements.',
-          icon: Icons.rate_review_outlined,
-          accentColor: _DashboardPalette.feedbackIndigo,
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => FeedbackScreen(
+              initialRole: _role,
+              isLocalAdmin: _isLocalAdmin,
+            ),
+          ),
         );
         break;
       case _MenuDestination.notificationCenter:

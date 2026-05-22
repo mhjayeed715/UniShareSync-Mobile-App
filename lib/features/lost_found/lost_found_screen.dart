@@ -906,7 +906,7 @@ class _LostFoundScreenState extends State<LostFoundScreen> {
                                 children: [
                                   Expanded(
                                     child: DropdownButtonFormField<String>(
-                                      value: _selectedCategoryFilter,
+                                      initialValue: _selectedCategoryFilter,
                                       decoration: InputDecoration(
                                         filled: true,
                                         fillColor: Colors.white.withOpacity(0.9),
@@ -936,7 +936,7 @@ class _LostFoundScreenState extends State<LostFoundScreen> {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: DropdownButtonFormField<LostFoundStatus?>(
-                                      value: _selectedStatusFilter,
+                                      initialValue: _selectedStatusFilter,
                                       decoration: InputDecoration(
                                         filled: true,
                                         fillColor: Colors.white.withOpacity(0.9),
@@ -1257,7 +1257,7 @@ class _LostFoundReportFormScreenState extends State<_LostFoundReportFormScreen> 
   DateTime _selectedDate = DateTime.now();
   final List<Uint8List> _photoBytes = <Uint8List>[];
   final List<String> _photoNames = <String>[];
-  bool _isSubmitting = false;
+  final bool _isSubmitting = false;
 
   static const List<String> _categories = [
     'Personal Items',
@@ -1469,7 +1469,7 @@ class _LostFoundReportFormScreenState extends State<_LostFoundReportFormScreen> 
                     ),
                     const SizedBox(height: 14),
                     DropdownButtonFormField<String>(
-                      value: _selectedCategory,
+                      initialValue: _selectedCategory,
                       decoration: const InputDecoration(labelText: 'Category'),
                       items: _categories
                           .map(

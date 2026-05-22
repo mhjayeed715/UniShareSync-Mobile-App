@@ -269,7 +269,7 @@ class ProjectsService {
 
       print('DEBUG: project_members response: $membersResponse');
       
-      if (membersResponse == null || (membersResponse as List).isEmpty) {
+      if ((membersResponse as List).isEmpty) {
         print('DEBUG: No members found for any project');
         return projects;
       }
@@ -298,11 +298,6 @@ class ProjectsService {
           .inFilter('id', userIds.toList());
 
       print('DEBUG: profiles response: $profilesResponse');
-      
-      if (profilesResponse == null) {
-        print('DEBUG: Profiles response is null');
-        return projects;
-      }
       
       final namesByUserId = <String, String>{};
       for (final row in profilesResponse as List<dynamic>) {
