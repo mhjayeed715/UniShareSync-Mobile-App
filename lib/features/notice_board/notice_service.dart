@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:unisharesync_mobile_app/core/utils/image_compression.dart';
 import 'notice_model.dart';
 
 class NoticeService {
@@ -156,14 +157,37 @@ class NoticeService {
     if (attachmentBytes != null && attachmentFileName != null) {
       final ext = attachmentFileName.split('.').last.toLowerCase();
       attachmentType = ext == 'pdf' ? 'pdf' : 'image';
-      final storagePath =
-          'notices/${DateTime.now().millisecondsSinceEpoch}_$attachmentFileName';
-      await _client.storage
-          .from('notice_attachments')
-          .uploadBinary(storagePath, attachmentBytes);
-      attachmentUrl = _client.storage
-          .from('notice_attachments')
-          .getPublicUrl(storagePath);
+
+      if (attachmentType == 'pdf') {
+        final storagePath =
+            'notices/${DateTime.now().millisecondsSinceEpoch}_$attachmentFileName';
+        await _client.storage
+            .from('notice_attachments')
+            .uploadBinary(storagePath, attachmentBytes);
+        attachmentUrl = _client.storage
+            .from('notice_attachments')
+            .getPublicUrl(storagePath);
+      } else {
+        final compressed = await ImageCompression.toWebp(
+              attachmentBytes,
+              maxDimension: 1600,
+              quality: 80,
+            ) ??
+            attachmentBytes;
+        final storagePath =
+            'notices/${DateTime.now().millisecondsSinceEpoch}_${attachmentFileName.split('.').first}.webp';
+        await _client.storage.from('notice_attachments').uploadBinary(
+              storagePath,
+              compressed,
+              fileOptions: const FileOptions(
+                upsert: true,
+                contentType: 'image/webp',
+              ),
+            );
+        attachmentUrl = _client.storage
+            .from('notice_attachments')
+            .getPublicUrl(storagePath);
+      }
     }
 
     final notice = NoticeModel(

@@ -71,7 +71,7 @@ class _AdminNoticeBoardScreenState extends State<AdminNoticeBoardScreen> {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'gif'],
         withData: true,
       );
       if (result != null && result.files.isNotEmpty) {
@@ -488,7 +488,7 @@ class _AdminNoticeCard extends StatelessWidget {
               ),
             ],
           ),
-          if (notice.attachmentUrl != null) ...[
+          if (notice.attachmentUrl != null && notice.attachmentUrl!.trim().isNotEmpty) ...[
             const SizedBox(height: 8),
             _AttachmentChip(
               type: notice.attachmentType,

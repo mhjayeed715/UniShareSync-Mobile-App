@@ -340,6 +340,7 @@ class NoticeDetailScreen extends StatelessWidget {
     ];
     return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
   }
+
 }
 
 // ── Private widgets ───────────────────────────────────────────────────────────
@@ -417,7 +418,7 @@ class _NoticeListCard extends StatelessWidget {
               style:
                   TextStyle(color: Colors.grey.shade700, fontSize: 13),
             ),
-            if (notice.attachmentUrl != null) ...[
+            if (notice.attachmentUrl != null && notice.attachmentUrl!.trim().isNotEmpty) ...[
               const SizedBox(height: 8),
               Row(
                 children: [

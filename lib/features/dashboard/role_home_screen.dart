@@ -13,6 +13,7 @@ import 'package:unisharesync_mobile_app/features/profile/profile_management_scre
 import 'package:unisharesync_mobile_app/features/projects/projects_screen.dart';
 import 'package:unisharesync_mobile_app/features/resources/resources_tab_view.dart';
 import 'package:unisharesync_mobile_app/features/events_clubs/events_clubs_screen.dart';
+import 'package:unisharesync_mobile_app/features/lost_found/lost_found_screen.dart';
 import 'package:unisharesync_mobile_app/services/auth_service.dart';
 import 'package:unisharesync_mobile_app/services/dashboard_feed_service.dart';
 
@@ -376,11 +377,13 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
         );
         break;
       case _MenuDestination.lostAndFound:
-        await _openFeatureModule(
-          title: 'Lost and Found',
-          subtitle: 'Report and discover lost or found items.',
-          icon: Icons.search_rounded,
-          accentColor: _DashboardPalette.lostFoundSoftRed,
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => LostFoundScreen(
+              initialRole: _role,
+              isLocalAdmin: _isLocalAdmin,
+            ),
+          ),
         );
         break;
       case _MenuDestination.feedback:
@@ -805,11 +808,13 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
                 label: 'Lost & Found',
                 color: _DashboardPalette.lostFoundSoftRed,
                 onTap: () {
-                  _openFeatureModule(
-                    title: 'Lost & Found',
-                    subtitle: 'Report and discover lost or found items.',
-                    icon: Icons.search_rounded,
-                    accentColor: _DashboardPalette.lostFoundSoftRed,
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => LostFoundScreen(
+                        initialRole: _role,
+                        isLocalAdmin: _isLocalAdmin,
+                      ),
+                    ),
                   );
                 },
               ),
