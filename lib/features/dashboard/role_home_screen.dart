@@ -16,6 +16,7 @@ import 'package:unisharesync_mobile_app/features/scheduler/class_scheduler_scree
 import 'package:unisharesync_mobile_app/features/events_clubs/events_clubs_screen.dart';
 import 'package:unisharesync_mobile_app/features/lost_found/lost_found_screen.dart';
 import 'package:unisharesync_mobile_app/features/feedback/feedback_screen.dart';
+import 'package:unisharesync_mobile_app/features/ai_chat/ai_chat_screen.dart';
 import 'package:unisharesync_mobile_app/services/auth_service.dart';
 import 'package:unisharesync_mobile_app/services/dashboard_feed_service.dart';
 
@@ -270,8 +271,10 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
                               'Ask about classes, notices, and campus info.',
                           onTap: () {
                             Navigator.of(context).pop();
-                            _showSnackBar(
-                              'AI chatbot action triggered. Connect this to your chatbot screen.',
+                            Navigator.of(this.context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const AiChatScreen(),
+                              ),
                             );
                           },
                         ),
@@ -409,11 +412,8 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
         });
         break;
       case _MenuDestination.aiCampusAssistant:
-        await _openFeatureModule(
-          title: 'AI Campus Assistant',
-          subtitle: 'Ask campus questions and get instant guided help.',
-          icon: Icons.smart_toy_outlined,
-          accentColor: _DashboardPalette.aiAssistantViolet,
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AiChatScreen()),
         );
         break;
       case _MenuDestination.busTracker:
