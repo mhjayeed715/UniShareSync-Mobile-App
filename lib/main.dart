@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:unisharesync_mobile_app/core/config/app_secrets.dart';
 import 'package:unisharesync_mobile_app/features/splash/splash_screen.dart';
 
@@ -7,6 +8,8 @@ final supabase = Supabase.instance.client;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Hive.initFlutter();
 
   await Supabase.initialize(
     url: AppSecrets.supabaseUrl,

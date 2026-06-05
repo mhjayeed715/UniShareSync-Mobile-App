@@ -12,6 +12,9 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
   supabase_flutter: ^2.12.2
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  csv: ^6.0.0
   image: ^4.2.0
   image_picker: ^1.2.0
   shared_preferences: ^2.5.3
@@ -28,3 +31,5 @@ flutter:
   uses-material-design: true
   assets:
     - lib/assets/logos/unisharesync.png
+    - 9A Winter 2026 - Central Routine.csv
+    - Course Offer Winter 2026 - Course Distribution.csv

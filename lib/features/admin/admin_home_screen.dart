@@ -8,6 +8,7 @@ import 'package:unisharesync_mobile_app/features/notice_board/admin_notice_board
 import 'package:unisharesync_mobile_app/features/admin/admin_projects_screen.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_events_screen.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_clubs_screen.dart';
+import 'package:unisharesync_mobile_app/features/admin/admin_class_scheduler_screen.dart';
 import 'package:unisharesync_mobile_app/features/feedback/feedback_screen.dart';
 import 'package:unisharesync_mobile_app/features/lost_found/lost_found_screen.dart';
 import 'package:unisharesync_mobile_app/features/profile/profile_management_screen.dart';
@@ -303,6 +304,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           ),
         );
       }
+      return;
+    }
+
+    if (option.title == 'Class Scheduler') {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const AdminClassSchedulerScreen(),
+        ),
+      );
       return;
     }
 

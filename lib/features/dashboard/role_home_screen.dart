@@ -12,6 +12,7 @@ import 'package:unisharesync_mobile_app/features/notification_center/notificatio
 import 'package:unisharesync_mobile_app/features/profile/profile_management_screen.dart';
 import 'package:unisharesync_mobile_app/features/projects/projects_screen.dart';
 import 'package:unisharesync_mobile_app/features/resources/resources_tab_view.dart';
+import 'package:unisharesync_mobile_app/features/scheduler/class_scheduler_screen.dart';
 import 'package:unisharesync_mobile_app/features/events_clubs/events_clubs_screen.dart';
 import 'package:unisharesync_mobile_app/features/lost_found/lost_found_screen.dart';
 import 'package:unisharesync_mobile_app/features/feedback/feedback_screen.dart';
@@ -84,7 +85,6 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
   Timer? _clockTicker;
 
   late final Stream<List<DashboardFeedItem>> _resourceStream;
-  late final Stream<List<DashboardFeedItem>> _routineStream;
 
   @override
   void initState() {
@@ -92,8 +92,6 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
 
     _resourceStream =
         _dashboardFeedService.watchResources(limit: 30).asBroadcastStream();
-    _routineStream =
-        _dashboardFeedService.watchRoutines(limit: 25).asBroadcastStream();
 
     _startClockTicker();
     _resolveSession();
@@ -578,61 +576,7 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
   }
 
   Widget _buildRoutineTab() {
-    return Column(
-      key: const PageStorageKey<String>('routine-tab'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 8),
-        const _TabHeader(
-          title: 'Routine Viewer',
-          subtitle: 'Live routine items from routines table',
-        ),
-        const SizedBox(height: 10),
-        Expanded(
-          child: StreamBuilder<List<DashboardFeedItem>>(
-            stream: _routineStream,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              if (snapshot.hasError) {
-                return _EmptyState(
-                  title: 'Unable to load routine',
-                  subtitle: '${snapshot.error}',
-                );
-              }
-
-              final items = snapshot.data ?? const <DashboardFeedItem>[];
-              if (items.isEmpty) {
-                return const _EmptyState(
-                  title: 'No routine entries yet',
-                  subtitle:
-                      'Add routine rows in your database and they will appear in real time.',
-                );
-              }
-
-              return ListView.separated(
-                padding: const EdgeInsets.fromLTRB(0, 4, 0, 118),
-                itemCount: items.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final item = items[index];
-                  return _FeedCard(
-                    icon: Icons.calendar_today_rounded,
-                    iconColor: const Color(0xFF0F766E),
-                    title: item.title,
-                    subtitle: item.subtitle,
-                    trailing: _relativeTime(item.createdAt),
-                    tag: item.category,
-                  );
-                },
-              );
-            },
-          ),
-        ),
-      ],
-    );
+    return const ClassSchedulerScreen(key: PageStorageKey<String>('routine-tab'));
   }
 
   Widget _buildProfileTab() {

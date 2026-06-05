@@ -1,0 +1,205 @@
+Batch,Semester,Course Code,Course Title,Credit,Credit Hour,Section,Faculty Initial,Facuty Name
+38th,1st,CSE 1100,Computer Fundamentals and Ethics,1.5,3,A,FHM,Md. Fazle Hasan Mihad
+,,,,,3,B,FA,Faria Afrin Niha
+,,CSE 1101,Structured Programming,3,3,A,ANM,Ahamad Nokib Mozumder
+,,,,,3,B,SHB,Sazzad Hossain Bhuiyan
+,,CSE 1102,Structured Programming Sessional,1.5,3,A1,ANM,Ahamad Nokib Mozumder
+,,,,,3,A2,ANM,Ahamad Nokib Mozumder
+,,,,,3,B1,ANM,Ahamad Nokib Mozumder
+,,,,,3,B2,ANM,Ahamad Nokib Mozumder
+,,MAT 1101,Calculus and Co-ordinate Geometry,3,3,A,ABM,Md. Abdullah Bin Masud
+,,,,,3,B,ABM,Md. Abdullah Bin Masud
+,,ECA 1101,Economics and Accounting,3,3,A,FAS,Fatima Saki
+,,,,,3,B,FAS,Fatima Saki
+,,BDS 1101,Bangladesh Studies,3,3,A,DJM,Dr. Jobayar Mohamed Faruk
+,,,,,3,B,DJM,Dr. Jobayar Mohamed Faruk
+,,PHY 1101,Physics,3,3,A,SAR,Saeema Rahim
+,,,,,3,B,SAR,Saeema Rahim
+,,PHY 1102,Physics Sessional,0.75,1.5,A1,SAR,Saeema Rahim
+,,,,,1.5,A2,SAR,Saeema Rahim
+,,,,,1.5,B1,SAR,Saeema Rahim
+,,,,,1.5,B2,SAR,Saeema Rahim
+,,,Total,18.75,54,20,,
+,,,,,,,,
+37th,2nd,CSE 1201,Data Structure,3,3,A,THL,Md Tousif Hasan Lavlu
+,,,,,3,B,SAK,Shad Al Kaiser
+,,CSE 1202,Data Structure Sessional,1.5,3,A1,THL,Md Tousif Hasan Lavlu
+,,,,,3,A2,THL,Md Tousif Hasan Lavlu
+,,,,,3,B1,THL,Md Tousif Hasan Lavlu
+,,,,,3,B2,THL,Md Tousif Hasan Lavlu
+,,EEE 1101,Electrical Circuits,3,3,A,SAR,Saeema Rahim
+,,,,,3,B,MN,Md. Naim
+,,EEE 1102,Electrical Circuits Sessional,0.75,1.5,A1,SAR,Saeema Rahim
+,,,,,1.5,A2,SAR,Saeema Rahim
+,,,,,1.5,B1,MN,Md. Naim
+,,,,,1.5,B2,MN,Md. Naim
+,,CSE 1203,Object Oriented Programming,3,3,A,FI,Faisal Imran
+,,,,,3,B,EKH,Ekhfa Hossain
+,,CSE 1204,Object Oriented Programming Sessional,1.5,3,A1,FI,Faisal Imran
+,,,,,3,A2,FI,Faisal Imran
+,,,,,3,B1,EKH,Ekhfa Hossain
+,,,,,3,B2,EKH,Ekhfa Hossain
+,,MAT 1203,Vector Analysis and Linear Algebra,3,3,A,ABM,Md. Abdullah Bin Masud
+,,,,,3,B,ABM,Md. Abdullah Bin Masud
+,,ECS 1203,English Communication Skills - II,2,1.5,A,MJL,Morium-E-Jannat Lima
+,,,,,1.5,B,JFU,Jannatul Ferdous Urmi
+,,CSE 1210,Competitive Programming Sessional-I,1.5,3,A1,IAZ,Imam Abu Zubaer
+,,,,,3,A2,IAZ,Imam Abu Zubaer
+,,,,,3,B1,SDS,Samirah Dilshad Salsabil
+,,,,,3,B2,IAZ,Imam Abu Zubaer
+,,,Total,19.25,69,25,,
+,,,,,,,,
+36th,3rd,CSE 2100,Software Development Project-I,1.5,3,A1,EKH,Ekhfa Hossain
+,,,,,3,A2,SAK,Shad Al Kaiser
+,,CSE 2101,Python Programming Language,3,3,A,TA,Tahsin Alam
+,,CSE 2102,Python Programming Language Sessional,1.5,3,A1,MDS,Md. Delwar Shahadat Deepu
+,,,,,3,A2,MDS,Md. Delwar Shahadat Deepu
+,,BCC 2101,Biology and Chemistry in Computation,3,3,A,EKH,Ekhfa Hossain
+,,EEE 2103,Digital Logic Design,3,3,A,MN,Md. Naim
+,,EEE 2104,Digital Logic Design Sessional,0.75,1.5,A1,MN,Md. Naim
+,,,,,1.5,A2,MN,Md. Naim
+,,CSE 2103,Discrete Mathematics,3,3,A,TA,Tahsin Alam
+,,MAT 2105,"Complex Variable, Differential Equation and Harmonic Analysis",3,3,A,ABM,Md. Abdullah Bin Masud
+,,CSE 2110,Competitive Programming Sessional-II,1.5,3,A1,JFJ,Jannatul Ferdos Jui
+,,,,,3,A2,JFJ,Jannatul Ferdos Jui
+,,,Total,20.25,36,13,,
+,,,,,,,,
+35th,4th,CSE 2200,Web (Front End) Development Project,1.5,3,A1,AIN,Md. Abdullah Ibn Noor
+,,,,,3,A2,AIN,Md. Abdullah Ibn Noor
+,,,,,3,B1,AIN,Md. Abdullah Ibn Noor
+,,,,,3,B2,AIN,Md. Abdullah Ibn Noor
+,,CSE 2201,Design and Analysis of Algorithms,3,3,A,SDO,Sakhor Das Opi
+,,,,,3,B,SHB,Sazzad Hossain Bhuiyan
+,,CSE 2202,Design and Analysis of Algorithms Sessional,1.5,3,A1,SDO,Sakhor Das Opi
+,,,,,3,A2,SDO,Sakhor Das Opi
+,,,,,3,B1,SDO,Sakhor Das Opi
+,,,,,3,B2,SDO,Sakhor Das Opi
+,,EEE 2205,Electronic Device and Circuits,3,3,A,SAR,Saeema Rahim
+,,,,,3,B,MN,Md. Naim
+,,EEE 2206,Electronic Device and Circuits Sessional,0.75,1.5,A1,TA,Tahsin Alam
+,,,,,1.5,A2,TA,Tahsin Alam
+,,,,,1.5,B1,MN,Md. Naim
+,,,,,1.5,B2,MN,Md. Naim
+,,MAT 2207,Numerical Methods,3,3,A,EJ,Easrat Jahan
+,,,,,3,B,DMAA,Prof. Dr. Md. Ayub Ali
+,,MAT 2208,Numerical Methods Sessional,0.75,1.5,A1,EJ,Easrat Jahan
+,,,,,1.5,A2,EJ,Easrat Jahan
+,,,,,1.5,B1,EJ,Easrat Jahan
+,,,,,1.5,B2,EJ,Easrat Jahan
+,,CSE 2207,Database Management System,3,3,A,AIN,Md. Abdullah Ibn Noor
+,,,,,3,B,JFJ,Jannatul Ferdos Jui
+,,CSE 2208,Database Management System Sessional,0.75,1.5,A1,THL,Md Tousif Hasan Lavlu
+,,,,,1.5,A2,THL,Md Tousif Hasan Lavlu
+,,,,,1.5,B1,JFJ,Jannatul Ferdos Jui
+,,,,,1.5,B2,JFJ,Jannatul Ferdos Jui
+,,CSE 2209,Artificial Intelligence,3,3,A,ARD,Abdur Rab Dhruba
+,,,,,3,B,ARD,Abdur Rab Dhruba
+,,,Total,20.25,72,30,,
+,,,,,,,,
+34th,5th,CSE 3100,Web (Back End) Development Project,1.5,3,A1,AIN,Md. Abdullah Ibn Noor
+,,,,,3,A2,SDS,Samirah Dilshad Salsabil
+,,CSE 3101,Formal Languages and Compilers,3,3,A,TD,Tauhid
+,,CSE 3102,Formal Languages and Compilers Sessional,1.5,3,A1,TD,Tauhid
+,,,,,3,A2,TD,Tauhid
+,,STA 3001,Statistics,3,3,A,ABM,Md. Abdullah Bin Masud
+,,CSE 3103,"Microprocessor, Microcontroller and Assembly Language",3,3,A,MOH,Prof Mohammad Mobarak Hossain
+,,CSE 3104,"Microprocessor, Microcontroller and Assembly Language Sessional",1.5,3,A1,MOH,Prof Mohammad Mobarak Hossain
+,,,,,3,A2,MOH,Prof Mohammad Mobarak Hossain
+,,CSE 3105,Operating Systems,3,3,A,TD,Tauhid
+,,CSE 3106,Operating Systems Sessional,0.75,1.5,A1,TD,Tauhid
+,,,,,1.5,A2,TD,Tauhid
+,,CSE 3107,Software Engineering,3,3,A,FHM,Md. Fazle Hasan Mihad
+,,,Total,20.25,36,13,,
+,,,,,,,,
+33rd,6th,CSE 3200,Advanced Software/Hardware Development Project,0.75,1.5,A1,EKH,Ekhfa Hossain
+,,,,,1.5,A2,TA,Tahsin Alam
+,,CSE 3201,Data Communication and Computer Networks,3,3,A,FHM,Md. Fazle Hasan Mihad
+,,CSE 3202,Data Communication and Computer Networks Sessional,1.5,3,A1,FHM,Md. Fazle Hasan Mihad
+,,,,,3,A2,FHM,Md. Fazle Hasan Mihad
+,,CSE 3203,Machine learning,3,3,A,IAZ,Imam Abu Zubaer
+,,CSE 3204,Machine learning sessional,1.5,3,A1,MDS,Md. Delwar Shahadat Deepu
+,,,,,3,A2,MDS,Md. Delwar Shahadat Deepu
+,,CSE 3205,Information System Analysis and Design,3,3,A,EJ,Easrat Jahan
+,,CSE 3206,Information System Analysis and Design Sessional,0.75,1.5,A1,SDS,Samirah Dilshad Salsabil
+,,,,,1.5,A2,TD,Tauhid
+,,CSE 3207,Computer Architecture,3,3,A,SDS,Samirah Dilshad Salsabil
+,,CSE 3209,Software Project Management,3,3,A,FA,Faria Afrin Niha
+,,CSE 3210,Mobile Application Development Lab,0.75,1.5,A1,SAK,Shad Al Kaiser
+,,,,,1.5,A2,TD,Tauhid
+,,,Total,20.25,36,15,,
+,,,,,,,,
+32nd,7th,CSE 4100,"Thesis or Project - I, Internship based (Phase I, to be completed in 4th Year 7th Semester)",3,3,A,FI,Faisal Imran
+,,CSE 4101,IT Service Management,3,3,A,FA,Faria Afrin Niha
+,,CSE 4103,Cybersecurity,3,3,A,DRI,Prof. Dr. Rabiul Islam
+,,CSE 4104,Cybersecurity Sessional,1.5,3,A1,DRI,Prof. Dr. Rabiul Islam
+,,,,,3,A2,DRI,Prof. Dr. Rabiul Islam
+,,CSE 4105,Digital Signal and Image Processing,3,3,A,FA,Faria Afrin Niha
+,,PPD 4001,Personal and Professional Development,2,1.5,A,DKA,Dr. Kazi Abdul Mannan
+,,CSE 4117,Neural Networks and Deep Learning,3,3,A,MMH,Md Mehedi Hasan
+,,CSE 4118,Neural Networks and Deep Learning Sessional,1.5,3,A1,MMH,Md Mehedi Hasan
+,,,,,3,A2,MMH,Md Mehedi Hasan
+,,,Total,20,28.5,10,,
+,,,,,,,,
+31st,9th,CSE 2367,Computer Architecture,3,3,A,MOH,Prof Mohammad Mobarak Hossain
+,,,,,3,B,IAZ,Imam Abu Zubaer
+,,CSE 4131,Mobile Application and Development,1.5,3,A1,SAK,Shad Al Kaiser
+,,,,,3,A2,MDS,Md. Delwar Shahadat Deepu
+,,,,,3,B1,SAK,Shad Al Kaiser
+,,,,,3,B2,SAK,Shad Al Kaiser
+,,CSE 4251,Machine Learning,3,3,A,MMH,Md Mehedi Hasan
+,,,,,3,B,MAK,Md. Akram Hossain
+,,CSE 4252,Machine Learning Lab,1.5,3,A1,MMH,Md Mehedi Hasan
+,,,,,3,A2,MDS,Md. Delwar Shahadat Deepu
+,,,,,3,B1,MAK,Md. Akram Hossain
+,,,,,3,B2,MAK,Md. Akram Hossain
+,,CSE 4115,Python Programming Language,3,3,A,TA,Tahsin Alam
+,,,,,3,B,ARD,Abdur Rab Dhruba
+,,CSE 4116,Python Programming Language Lab,1.5,3,A1,TA,Tahsin Alam
+,,,,,3,A2,TA,Tahsin Alam
+,,,,,3,B1,ARD,Abdur Rab Dhruba
+,,,,,3,B2,ARD,Abdur Rab Dhruba
+,,ICT 4106,Project III,1,1.5,A,TA,Tahsin Alam
+,,,,,1.5,B,ARD,Abdur Rab Dhruba
+,,ECO 3201,Engineering Economics,2,1.5,A,DKR,Dr. Md. Khalilur Rahman
+,,,,,1.5,B,AFJ,Afrin Jahan
+,,CHM 2101,Chemistry,3,3,A,DMR,Dr. Mohammad Mostafizur Rahman
+,,,,,3,B,DMR,Dr. Mohammad Mostafizur Rahman
+,,,Total,19.5,66,24,,
+,,,,,,,,
+30th,10th,ICT 4308,Project/Thesis (Final),4,4,A,FI,Faisal Imran
+,,CSE 4145,Digital Image Processing,3,3,A,FA,Faria Afrin Niha
+,,CSE 4233,Robotics,3,3,A,MN,Md. Naim
+,,CSE 4131,Mobile Application and Development,1.5,3,A1,JFJ,Jannatul Ferdos Jui
+,,,,,3,A2,JFJ,Jannatul Ferdos Jui
+,,CSE 4251,Machine Learning,3,3,A,MAK,Md. Akram Hossain
+,,CSE 4252,Machine Learning Lab,1.5,3,A1,MAK,Md. Akram Hossain
+,,,,,3,A2,MAK,Md. Akram Hossain
+,,,Total,16,25,8,,
+,,,,,,,,
+,,,,,,,,
+,,,CSIT Extra,,,,,
+Batch,Semester,Course Code,Course Title,Credit,Credit Hour,Section,Faculty,
+31st,9th,MIS 3301,Management Information System,2,1.5,B,ARD,Abdur Rab Dhruba
+,,,,,,,,
+,,,Community Class,,,,,
+Batch,Semester,Course Code,Course Title,Credit,Credit Hour,Section,Faculty,
+All,All,CP Com,Competitive Programming Community,Non Credit,3,All,SDO,Sakhor Das Opi
+All,All,IoT Com,Robotics and IoT Community,Non Credit,3,All,MN,Md. Naim
+All,All,ML Com,Machine Learning Community,Non Credit,3,All,MMH,Md Mehedi Hasan
+All,All,Soft Com,Software Community,Non Credit,3,All,ANM,Ahamad Nokib Mozumder
+All,All,Cyber Com,Networking and Cyber Community,Non Credit,3,All,FHM,Md. Fazle Hasan Mihad
+,,,,,,,,
+,,,,,,,,
+,,,,,,,,
+,,,,,,,,
+,,,,,,,,
+,,,Non-Department,,,,,
+Batch,Semester,Course Code,Course Title,Credit,Credit Hour,Section,Faculty,
+N/A,1st,CSE 1101,Computer Application in Business,3,3,A,EJ,Easrat Jahan
+N/A,1st,CSE 1101,Computer Application in Business,3,3,B,SDS,Samirah Dilshad Salsabil
+N/A,2nd,CSE 1101,Computer Application in Business,3,3,A,EJ,Easrat Jahan
+N/A,2nd,CSE 1101,Computer Application in Business,3,3,B,FA,Faria Afrin Niha
+N/A,1st,CSE 1101,Basic Computing,3,3,A,SDS,Samirah Dilshad Salsabil
+N/A,9th,CSE 1101,Basic Computing,1.5,1.5,A,EKH,Ekhfa Hossain
+N/A,5th,CSE 1101,Basic Computing Lab,1.5,1.5,A,SAK,Shad Al Kaiser
+N/A,1st,CSE 1101,Basic Computing,1.5,1.5,A,SDS,Samirah Dilshad Salsabil
