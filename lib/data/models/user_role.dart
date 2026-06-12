@@ -1,7 +1,8 @@
 enum UserRole {
   student,
   faculty,
-  admin;
+  admin,
+  driver;
 
   String get value => name;
 
@@ -13,6 +14,8 @@ enum UserRole {
         return 'Faculty';
       case UserRole.admin:
         return 'Admin';
+      case UserRole.driver:
+        return 'Bus Driver';
     }
   }
 
@@ -22,6 +25,8 @@ enum UserRole {
         return UserRole.faculty;
       case 'admin':
         return UserRole.admin;
+      case 'driver':
+        return UserRole.driver;
       case 'student':
       default:
         return UserRole.student;

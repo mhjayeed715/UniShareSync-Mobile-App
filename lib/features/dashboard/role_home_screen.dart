@@ -17,6 +17,7 @@ import 'package:unisharesync_mobile_app/features/events_clubs/events_clubs_scree
 import 'package:unisharesync_mobile_app/features/lost_found/lost_found_screen.dart';
 import 'package:unisharesync_mobile_app/features/feedback/feedback_screen.dart';
 import 'package:unisharesync_mobile_app/features/ai_chat/ai_chat_screen.dart';
+import 'package:unisharesync_mobile_app/features/bus_tracker/bus_tracker_screen.dart';
 import 'package:unisharesync_mobile_app/services/auth_service.dart';
 import 'package:unisharesync_mobile_app/services/dashboard_feed_service.dart';
 
@@ -351,12 +352,8 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
         });
         break;
       case _MenuDestination.settings:
-        await _openFeatureModule(
-          title: 'Settings',
-          subtitle: 'Preferences, privacy, and app controls.',
-          icon: Icons.settings_outlined,
-          accentColor: _DashboardPalette.settingsSlate,
-        );
+        // Settings row navigates inline via profile tab — no separate screen needed
+        setState(() { _activeTab = _DashboardTab.profile; });
         break;
       case _MenuDestination.resources:
         setState(() {
@@ -399,11 +396,8 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
         );
         break;
       case _MenuDestination.notificationCenter:
-        await _openFeatureModule(
-          title: 'Notification Center',
-          subtitle: 'All important alerts and updates in one place.',
-          icon: Icons.notifications_active_outlined,
-          accentColor: _DashboardPalette.notificationSky,
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const NotificationCenterScreen()),
         );
         break;
       case _MenuDestination.classScheduler:
@@ -417,11 +411,12 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
         );
         break;
       case _MenuDestination.busTracker:
-        await _openFeatureModule(
-          title: 'Bus Tracker',
-          subtitle: 'Track campus bus routes and live timings.',
-          icon: Icons.directions_bus_rounded,
-          accentColor: _DashboardPalette.busTrackerTeal,
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => BusTrackerScreen(
+              currentUserName: _profile?.fullName ?? 'Campus User',
+            ),
+          ),
         );
         break;
     }
@@ -589,22 +584,94 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
           role: _role,
           isLocalAdmin: _isLocalAdmin,
         ),
-        const SizedBox(height: 14),
-        _GlassButton(
-          icon: Icons.person_rounded,
-          label: 'Manage Profile',
-          onTap: _openProfileEditor,
+        const SizedBox(height: 20),
+        // ── Account section ───────────────────────────────────────────────
+        const _SettingsSectionLabel(label: 'Account'),
+        const SizedBox(height: 6),
+        _GlassSettingsGroup(
+          children: [
+            _SettingsRow(
+              icon: Icons.person_outline_rounded,
+              iconColor: _DashboardPalette.authBlue,
+              label: 'Edit Profile',
+              onTap: _openProfileEditor,
+            ),
+            _SettingsRow(
+              icon: Icons.notifications_none_rounded,
+              iconColor: _DashboardPalette.notificationSky,
+              label: 'Notifications',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const NotificationCenterScreen()),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 10),
-        _GlassButton(
-          icon: Icons.logout_rounded,
-          label: _isSigningOut ? 'Signing Out...' : 'Sign Out',
-          onTap: _isSigningOut ? null : _signOut,
+        const SizedBox(height: 18),
+        // ── Campus section ────────────────────────────────────────────────
+        const _SettingsSectionLabel(label: 'Campus'),
+        const SizedBox(height: 6),
+        _GlassSettingsGroup(
+          children: [
+            _SettingsRow(
+              icon: Icons.campaign_rounded,
+              iconColor: _DashboardPalette.noticesAmber,
+              label: 'Notice Board',
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const NoticeBoardScreen())),
+            ),
+            _SettingsRow(
+              icon: Icons.directions_bus_rounded,
+              iconColor: _DashboardPalette.busTrackerTeal,
+              label: 'Bus Tracker',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => BusTrackerScreen(
+                      currentUserName: _profile?.fullName ?? 'Campus User'),
+                ),
+              ),
+            ),
+            _SettingsRow(
+              icon: Icons.smart_toy_outlined,
+              iconColor: _DashboardPalette.aiAssistantViolet,
+              label: 'AI Campus Assistant',
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const AiChatScreen())),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        // ── Support section ───────────────────────────────────────────────
+        const _SettingsSectionLabel(label: 'Support'),
+        const SizedBox(height: 6),
+        _GlassSettingsGroup(
+          children: [
+            _SettingsRow(
+              icon: Icons.rate_review_outlined,
+              iconColor: _DashboardPalette.feedbackIndigo,
+              label: 'Send Feedback',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => FeedbackScreen(
+                      initialRole: _role, isLocalAdmin: _isLocalAdmin),
+                ),
+              ),
+            ),
+          ],
         ),
         if (_isLocalAdmin) ...[
           const SizedBox(height: 14),
           const _LocalAdminNoticeCard(),
         ],
+        const SizedBox(height: 28),
+        // ── Sign out — always last, always red ────────────────────────────
+        _SignOutButton(
+          isLoading: _isSigningOut,
+          onTap: _isSigningOut ? null : _signOut,
+        ),
       ],
     );
   }
@@ -770,11 +837,12 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
                 label: 'Bus Tracker',
                 color: _DashboardPalette.busTrackerTeal,
                 onTap: () {
-                  _openFeatureModule(
-                    title: 'Bus Tracker',
-                    subtitle: 'Track campus bus routes and live timings.',
-                    icon: Icons.directions_bus_rounded,
-                    accentColor: _DashboardPalette.busTrackerTeal,
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => BusTrackerScreen(
+                        currentUserName: _profile?.fullName ?? 'Campus User',
+                      ),
+                    ),
                   );
                 },
               ),
@@ -1281,6 +1349,7 @@ class _ProfileHeaderCard extends StatelessWidget {
       UserRole.student => const Color(0xFF2563EB),
       UserRole.faculty => const Color(0xFF0F766E),
       UserRole.admin => const Color(0xFFEA580C),
+      UserRole.driver => const Color(0xFF14B8A6),
     };
 
     final displayName = profile?.fullName ??
@@ -1344,56 +1413,6 @@ class _ProfileHeaderCard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _GlassButton extends StatelessWidget {
-  const _GlassButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.8),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withOpacity(0.95)),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: _DashboardPalette.authBlue),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    color: Color(0xFF0F172A),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: Color(0xFF94A3B8),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -1475,22 +1494,6 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _MenuOption {
-  const _MenuOption({
-    required this.destination,
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-  });
-
-  final _MenuDestination destination;
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-}
-
 class _HamburgerMenuScreen extends StatelessWidget {
   const _HamburgerMenuScreen({
     required this.profile,
@@ -1502,98 +1505,22 @@ class _HamburgerMenuScreen extends StatelessWidget {
   final UserRole role;
   final bool isLocalAdmin;
 
+  void _go(BuildContext context, _MenuDestination d) =>
+      Navigator.of(context).pop(d);
+
   @override
   Widget build(BuildContext context) {
     final displayName = profile?.fullName ??
         (isLocalAdmin ? 'Fixed Credential Admin' : 'Campus User');
+    final email = profile?.email ?? (isLocalAdmin ? 'Local admin mode' : '');
     final roleLabel = isLocalAdmin ? 'Admin' : role.displayName;
 
-    const options = <_MenuOption>[
-      _MenuOption(
-        destination: _MenuDestination.profile,
-        title: 'Profile',
-        subtitle: 'Account information and profile settings.',
-        icon: Icons.person_outline_rounded,
-        color: _DashboardPalette.authBlue,
-      ),
-      _MenuOption(
-        destination: _MenuDestination.settings,
-        title: 'Settings',
-        subtitle: 'App controls, privacy, and preferences.',
-        icon: Icons.settings_outlined,
-        color: _DashboardPalette.settingsSlate,
-      ),
-      _MenuOption(
-        destination: _MenuDestination.resources,
-        title: 'Resource Screen',
-        subtitle: 'Study materials and shared academic resources.',
-        icon: Icons.menu_book_rounded,
-        color: _DashboardPalette.resourcesBlue,
-      ),
-      _MenuOption(
-        destination: _MenuDestination.noticeBoard,
-        title: 'Notice Board Screen',
-        subtitle: 'Latest official campus notices and announcements.',
-        icon: Icons.campaign_rounded,
-        color: _DashboardPalette.noticesAmber,
-      ),
-      _MenuOption(
-        destination: _MenuDestination.projects,
-        title: 'Projects Screen',
-        subtitle: 'Team projects and collaboration spaces.',
-        icon: Icons.account_tree_rounded,
-        color: _DashboardPalette.projectsPurple,
-      ),
-      _MenuOption(
-        destination: _MenuDestination.eventsAndClubs,
-        title: 'Events and Clubs Screen',
-        subtitle: 'Events, clubs, and participation updates.',
-        icon: Icons.celebration_rounded,
-        color: _DashboardPalette.eventsEmerald,
-      ),
-      _MenuOption(
-        destination: _MenuDestination.lostAndFound,
-        title: 'Lost and Found Screen',
-        subtitle: 'Report and recover lost campus items.',
-        icon: Icons.search_rounded,
-        color: _DashboardPalette.lostFoundSoftRed,
-      ),
-      _MenuOption(
-        destination: _MenuDestination.feedback,
-        title: 'Feedback Screen',
-        subtitle: 'Submit suggestions and issue reports.',
-        icon: Icons.rate_review_outlined,
-        color: _DashboardPalette.feedbackIndigo,
-      ),
-      _MenuOption(
-        destination: _MenuDestination.notificationCenter,
-        title: 'Notification Center',
-        subtitle: 'All alerts and campus updates in one place.',
-        icon: Icons.notifications_active_outlined,
-        color: _DashboardPalette.notificationSky,
-      ),
-      _MenuOption(
-        destination: _MenuDestination.classScheduler,
-        title: 'Class Scheduler',
-        subtitle: 'Daily class routine and academic schedule.',
-        icon: Icons.calendar_view_week_rounded,
-        color: _DashboardPalette.authTeal,
-      ),
-      _MenuOption(
-        destination: _MenuDestination.aiCampusAssistant,
-        title: 'AI Campus Assistant',
-        subtitle: 'Get instant smart help for campus tasks.',
-        icon: Icons.smart_toy_outlined,
-        color: _DashboardPalette.aiAssistantViolet,
-      ),
-      _MenuOption(
-        destination: _MenuDestination.busTracker,
-        title: 'Bus Tracker',
-        subtitle: 'Track routes and estimated arrival times.',
-        icon: Icons.directions_bus_rounded,
-        color: _DashboardPalette.busTrackerTeal,
-      ),
-    ];
+    final roleColor = switch (role) {
+      UserRole.student => const Color(0xFF2563EB),
+      UserRole.faculty => const Color(0xFF0F766E),
+      UserRole.admin => const Color(0xFFEA580C),
+      UserRole.driver => const Color(0xFF14B8A6),
+    };
 
     return Scaffold(
       backgroundColor: _DashboardPalette.scaffold,
@@ -1626,41 +1553,28 @@ class _HamburgerMenuScreen extends StatelessWidget {
             ),
           ),
           Positioned(
-            top: -90,
-            right: -60,
+            top: -90, right: -60,
             child: Container(
-              width: 220,
-              height: 220,
+              width: 220, height: 220,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: _DashboardPalette.authBlue.withOpacity(0.1),
               ),
             ),
           ),
-          Positioned(
-            bottom: -120,
-            left: -70,
-            child: Container(
-              width: 240,
-              height: 240,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _DashboardPalette.authTeal.withOpacity(0.08),
-              ),
-            ),
-          ),
           SafeArea(
             top: false,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 26),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
               children: [
+                // ── Profile card ────────────────────────────────────────
                 _GlassCard(
+                  padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
                       CircleAvatar(
-                        radius: 24,
-                        backgroundColor:
-                            _DashboardPalette.authBlue.withOpacity(0.14),
+                        radius: 28,
+                        backgroundColor: roleColor.withOpacity(0.15),
                         backgroundImage: profile?.avatarUrl != null
                             ? NetworkImage(profile!.avatarUrl!)
                             : null,
@@ -1669,14 +1583,15 @@ class _HamburgerMenuScreen extends StatelessWidget {
                                 displayName.isNotEmpty
                                     ? displayName[0].toUpperCase()
                                     : 'U',
-                                style: const TextStyle(
-                                  color: _DashboardPalette.authBlue,
+                                style: TextStyle(
+                                  color: roleColor,
                                   fontWeight: FontWeight.w800,
+                                  fontSize: 18,
                                 ),
                               )
                             : null,
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1693,38 +1608,144 @@ class _HamburgerMenuScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              roleLabel,
+                              email,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: Colors.grey.shade700,
-                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade600,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: roleColor.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                roleLabel,
+                                style: TextStyle(
+                                  color: roleColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
+                      GestureDetector(
+                        onTap: () => _go(context, _MenuDestination.profile),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: _DashboardPalette.authBlue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Text(
+                            'Edit',
+                            style: TextStyle(
+                              color: _DashboardPalette.authBlue,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Campus Navigation',
-                  style: TextStyle(
-                    color: Color(0xFF334155),
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ...options.map(
-                  (option) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _MenuNavigationTile(
-                      option: option,
-                      onTap: () {
-                        Navigator.of(context).pop(option.destination);
-                      },
+                const SizedBox(height: 22),
+
+                // ── Campus Features ──────────────────────────────────────
+                const _SettingsSectionLabel(label: 'Campus'),
+                const SizedBox(height: 6),
+                _GlassSettingsGroup(
+                  children: [
+                    _SettingsRow(
+                      icon: Icons.menu_book_rounded,
+                      iconColor: _DashboardPalette.resourcesBlue,
+                      label: 'Resources',
+                      onTap: () => _go(context, _MenuDestination.resources),
                     ),
-                  ),
+                    _SettingsRow(
+                      icon: Icons.campaign_rounded,
+                      iconColor: _DashboardPalette.noticesAmber,
+                      label: 'Notice Board',
+                      onTap: () => _go(context, _MenuDestination.noticeBoard),
+                    ),
+                    _SettingsRow(
+                      icon: Icons.account_tree_rounded,
+                      iconColor: _DashboardPalette.projectsPurple,
+                      label: 'Projects',
+                      onTap: () => _go(context, _MenuDestination.projects),
+                    ),
+                    _SettingsRow(
+                      icon: Icons.celebration_rounded,
+                      iconColor: _DashboardPalette.eventsEmerald,
+                      label: 'Events & Clubs',
+                      onTap: () =>
+                          _go(context, _MenuDestination.eventsAndClubs),
+                    ),
+                    _SettingsRow(
+                      icon: Icons.search_rounded,
+                      iconColor: _DashboardPalette.lostFoundSoftRed,
+                      label: 'Lost & Found',
+                      onTap: () => _go(context, _MenuDestination.lostAndFound),
+                    ),
+                    _SettingsRow(
+                      icon: Icons.directions_bus_rounded,
+                      iconColor: _DashboardPalette.busTrackerTeal,
+                      label: 'Bus Tracker',
+                      onTap: () => _go(context, _MenuDestination.busTracker),
+                    ),
+                    _SettingsRow(
+                      icon: Icons.calendar_view_week_rounded,
+                      iconColor: _DashboardPalette.authTeal,
+                      label: 'Class Scheduler',
+                      onTap: () =>
+                          _go(context, _MenuDestination.classScheduler),
+                    ),
+                    _SettingsRow(
+                      icon: Icons.smart_toy_outlined,
+                      iconColor: _DashboardPalette.aiAssistantViolet,
+                      label: 'AI Campus Assistant',
+                      onTap: () =>
+                          _go(context, _MenuDestination.aiCampusAssistant),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 22),
+
+                // ── Account ──────────────────────────────────────────────
+                const _SettingsSectionLabel(label: 'Account'),
+                const SizedBox(height: 6),
+                _GlassSettingsGroup(
+                  children: [
+                    _SettingsRow(
+                      icon: Icons.notifications_active_outlined,
+                      iconColor: _DashboardPalette.notificationSky,
+                      label: 'Notifications',
+                      onTap: () =>
+                          _go(context, _MenuDestination.notificationCenter),
+                    ),
+                    _SettingsRow(
+                      icon: Icons.rate_review_outlined,
+                      iconColor: _DashboardPalette.feedbackIndigo,
+                      label: 'Feedback',
+                      onTap: () => _go(context, _MenuDestination.feedback),
+                    ),
+                    _SettingsRow(
+                      icon: Icons.settings_outlined,
+                      iconColor: _DashboardPalette.settingsSlate,
+                      label: 'Settings',
+                      onTap: () => _go(context, _MenuDestination.settings),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -1735,68 +1756,199 @@ class _HamburgerMenuScreen extends StatelessWidget {
   }
 }
 
-class _MenuNavigationTile extends StatelessWidget {
-  const _MenuNavigationTile({
-    required this.option,
-    required this.onTap,
-  });
+// ── Settings section label ────────────────────────────────────────────────────
 
-  final _MenuOption option;
-  final VoidCallback onTap;
+class _SettingsSectionLabel extends StatelessWidget {
+  const _SettingsSectionLabel({required this.label});
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    return _GlassCard(
-      padding: EdgeInsets.zero,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(18),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: option.color.withOpacity(0.14),
-                    borderRadius: BorderRadius.circular(10),
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(
+        label.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF94A3B8),
+          letterSpacing: 0.8,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Grouped glass settings card ───────────────────────────────────────────────
+
+class _GlassSettingsGroup extends StatelessWidget {
+  const _GlassSettingsGroup({required this.children});
+  final List<_SettingsRow> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.78),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withOpacity(0.95)),
+          ),
+          child: Column(
+            children: [
+              for (int i = 0; i < children.length; i++) ...[
+                children[i],
+                if (i < children.length - 1)
+                  Divider(
+                    height: 1,
+                    indent: 54,
+                    endIndent: 0,
+                    color: const Color(0xFFE2E8F0).withOpacity(0.8),
                   ),
-                  child: Icon(option.icon, color: option.color, size: 20),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        option.title,
-                        style: const TextStyle(
-                          color: Color(0xFF0F172A),
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        option.subtitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.grey.shade700,
-                          fontSize: 12.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: Color(0xFF94A3B8),
-                ),
               ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Single settings row ───────────────────────────────────────────────────────
+
+class _SettingsRow extends StatelessWidget {
+  const _SettingsRow({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.onTap,
+    this.trailing,
+    this.isDestructive = false,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final VoidCallback? onTap;
+  final Widget? trailing;
+  final bool isDestructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final labelColor =
+        isDestructive ? const Color(0xFFDC2626) : const Color(0xFF0F172A);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: iconColor.withOpacity(0.13),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(icon, color: iconColor, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: labelColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+              trailing ??
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: isDestructive
+                        ? const Color(0xFFDC2626).withOpacity(0.4)
+                        : const Color(0xFFCBD5E1),
+                    size: 20,
+                  ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Sign Out button ───────────────────────────────────────────────────────────
+
+class _SignOutButton extends StatelessWidget {
+  const _SignOutButton({required this.isLoading, required this.onTap});
+  final bool isLoading;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.78),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withOpacity(0.95)),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(18),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 15),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDC2626).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: isLoading
+                          ? const Padding(
+                              padding: EdgeInsets.all(8),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation(
+                                    Color(0xFFDC2626)),
+                              ),
+                            )
+                          : const Icon(
+                              Icons.logout_rounded,
+                              color: Color(0xFFDC2626),
+                              size: 18,
+                            ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      isLoading ? 'Signing out...' : 'Sign Out',
+                      style: const TextStyle(
+                        color: Color(0xFFDC2626),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),

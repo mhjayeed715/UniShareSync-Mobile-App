@@ -65,6 +65,8 @@ class AuthService {
   final LocalSessionStore _localSessionStore;
   final ProfileService _profileService;
 
+  LocalSessionStore get localSessionStore => _localSessionStore;
+
   String? get currentUserId => _client.auth.currentUser?.id;
 
   Future<void> signUp(SignUpPayload payload) async {
@@ -212,6 +214,35 @@ class AuthService {
       }
     }
 
+    // ── Predefined driver accounts (local credential, no Supabase auth) ──────
+    final driverMatch = AppSecrets.driverAccounts.where(
+      (d) => d[0] == normalizedEmail && d[1] == normalizedPassword,
+    );
+    if (driverMatch.isNotEmpty) {
+      final driver = driverMatch.first;
+      await _localSessionStore.setLocalAdminSignedIn(false);
+      await _localSessionStore.setDriverSession(
+        email: driver[0],
+        name: driver[2],
+        routeId: driver[3],
+      );
+      return AuthSessionInfo(
+        role: UserRole.driver,
+        isLocalAdmin: false,
+        profile: ProfileModel(
+          id: driver[4],
+          email: driver[0],
+          fullName: driver[2],
+          role: UserRole.driver,
+          designation: 'Bus Driver',
+          avatarUrl: null,
+          department: null,
+          studentId: null,
+          semester: null,
+        ),
+      );
+    }
+
     final authResponse = await _client.auth.signInWithPassword(
       email: normalizedEmail,
       password: normalizedPassword,
@@ -264,13 +295,19 @@ class AuthService {
 
   Future<bool> hasActiveSession() async {
     return _client.auth.currentSession != null ||
-        await _localSessionStore.isLocalAdminSignedIn();
+        await _localSessionStore.isLocalAdminSignedIn() ||
+        await _localSessionStore.isDriverSignedIn();
   }
 
   Future<UserRole?> getCurrentRole() async {
     final hasLocalAdmin = await _localSessionStore.isLocalAdminSignedIn();
     if (hasLocalAdmin && _client.auth.currentSession == null) {
       return UserRole.admin;
+    }
+
+    final isDriver = await _localSessionStore.isDriverSignedIn();
+    if (isDriver && _client.auth.currentSession == null) {
+      return UserRole.driver;
     }
 
     final user = _client.auth.currentUser;
@@ -310,6 +347,7 @@ class AuthService {
 
   Future<void> signOut() async {
     await _localSessionStore.setLocalAdminSignedIn(false);
+    await _localSessionStore.clearDriverSession();
 
     if (_client.auth.currentSession != null) {
       await _client.auth.signOut();

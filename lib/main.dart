@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:unisharesync_mobile_app/core/config/app_secrets.dart';
 import 'package:unisharesync_mobile_app/features/splash/splash_screen.dart';
+import 'package:unisharesync_mobile_app/features/bus_tracker/bus_tracker_service.dart';
 
 final supabase = Supabase.instance.client;
 
@@ -15,6 +16,11 @@ Future<void> main() async {
     url: AppSecrets.supabaseUrl,
     anonKey: AppSecrets.supabaseAnonKey,
   );
+
+  // Init bus timetable cache — non-fatal if it fails
+  try {
+    await BusTrackerService.instance.initTimetable();
+  } catch (_) {}
 
   runApp(const UniShareSyncApp());
 }

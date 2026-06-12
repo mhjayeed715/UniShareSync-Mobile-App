@@ -6,6 +6,7 @@ import 'package:unisharesync_mobile_app/features/auth/legal_documents_screen.dar
 import 'package:unisharesync_mobile_app/features/auth/password_reset_screen.dart';
 import 'package:unisharesync_mobile_app/features/auth/signup_screen.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_home_screen.dart';
+import 'package:unisharesync_mobile_app/features/bus_tracker/driver_home_screen.dart';
 import 'package:unisharesync_mobile_app/features/dashboard/role_home_screen.dart';
 import 'package:unisharesync_mobile_app/services/auth_service.dart';
 
@@ -36,11 +37,14 @@ class _SignInScreenState extends State<SignInScreen> {
 
   bool _isUniversityEmail(String email) {
     final value = email.trim().toLowerCase();
+    // Allow fixed demo accounts
     if (value == AppSecrets.fixedAdminEmail.toLowerCase() ||
         value == AppSecrets.fixedFacultyEmail.toLowerCase()) {
       return true;
     }
-
+    // Allow predefined driver accounts
+    if (AppSecrets.driverAccounts.any((d) => d[0] == value)) return true;
+    // University email pattern
     final universityPattern = RegExp(
       r'^[a-z0-9]+(?:\.[a-z0-9]+)*@[a-z][a-z0-9-]*\.ac\.bd$',
     );
@@ -72,12 +76,22 @@ class _SignInScreenState extends State<SignInScreen> {
       final isAdminSession =
           session.role == UserRole.admin || session.isLocalAdmin;
 
-      final Widget nextScreen = isAdminSession
-          ? AdminHomeScreen(isLocalAdmin: session.isLocalAdmin)
-          : RoleHomeScreen(
-              initialRole: session.role,
-              isLocalAdmin: session.isLocalAdmin,
-            );
+      final Widget nextScreen;
+      if (session.role == UserRole.driver) {
+        final store = _authService.localSessionStore;
+        final driverSession = await store.getDriverSession();
+        nextScreen = DriverHomeScreen(
+          driverName: driverSession?['name'] ?? session.profile?.fullName ?? 'Driver',
+          assignedRouteId: driverSession?['routeId'] ?? '',
+        );
+      } else {
+        nextScreen = isAdminSession
+            ? AdminHomeScreen(isLocalAdmin: session.isLocalAdmin)
+            : RoleHomeScreen(
+                initialRole: session.role,
+                isLocalAdmin: session.isLocalAdmin,
+              );
+      }
 
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(

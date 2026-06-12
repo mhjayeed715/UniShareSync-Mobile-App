@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:unisharesync_mobile_app/data/models/user_role.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_home_screen.dart';
+import 'package:unisharesync_mobile_app/features/bus_tracker/driver_home_screen.dart';
 import 'package:unisharesync_mobile_app/features/dashboard/role_home_screen.dart';
 import 'package:unisharesync_mobile_app/features/onboarding/onboarding_screen.dart';
 import 'package:unisharesync_mobile_app/services/auth_service.dart';
@@ -63,14 +64,20 @@ class _SplashScreenState extends State<SplashScreen>
     } else {
       final role = await _authService.getCurrentRole();
       final isLocalAdmin = await _authService.isLocalAdminSession();
-      final isAdminSession = role == UserRole.admin || isLocalAdmin;
 
-      nextScreen = isAdminSession
-          ? AdminHomeScreen(isLocalAdmin: isLocalAdmin)
-          : RoleHomeScreen(
-              initialRole: role,
-              isLocalAdmin: isLocalAdmin,
-            );
+      if (role == UserRole.driver) {
+        final store = _authService.localSessionStore;
+        final session = await store.getDriverSession();
+        nextScreen = DriverHomeScreen(
+          driverName: session?['name'] ?? 'Driver',
+          assignedRouteId: session?['routeId'] ?? '',
+        );
+      } else {
+        final isAdminSession = role == UserRole.admin || isLocalAdmin;
+        nextScreen = isAdminSession
+            ? AdminHomeScreen(isLocalAdmin: isLocalAdmin)
+            : RoleHomeScreen(initialRole: role, isLocalAdmin: isLocalAdmin);
+      }
     }
 
     if (!mounted) {
