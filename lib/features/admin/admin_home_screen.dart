@@ -9,10 +9,11 @@ import 'package:unisharesync_mobile_app/features/admin/admin_projects_screen.dar
 import 'package:unisharesync_mobile_app/features/admin/admin_events_screen.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_clubs_screen.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_class_scheduler_screen.dart';
+import 'package:unisharesync_mobile_app/features/admin/admin_user_management_screen.dart';
 import 'package:unisharesync_mobile_app/features/feedback/feedback_screen.dart';
 import 'package:unisharesync_mobile_app/features/lost_found/lost_found_screen.dart';
 import 'package:unisharesync_mobile_app/features/profile/profile_management_screen.dart';
-import 'package:unisharesync_mobile_app/features/resources/resources_tab_view.dart';
+import 'package:unisharesync_mobile_app/features/admin/admin_resources_screen.dart';
 import 'package:unisharesync_mobile_app/services/auth_service.dart';
 
 class AdminHomeScreen extends StatefulWidget {
@@ -70,6 +71,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   ProfileModel? _profile;
 
   static const List<_AdminPanelOption> _options = [
+    _AdminPanelOption(
+      title: 'Role Control',
+      subtitle: 'Assign and audit user permissions.',
+      icon: Icons.admin_panel_settings_rounded,
+      color: _AdminPalette.roleControlCyan,
+    ),
     _AdminPanelOption(
       title: 'Profile',
       subtitle: 'Manage admin profile details.',
@@ -142,12 +149,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       icon: Icons.directions_bus_rounded,
       color: _AdminPalette.busTrackerTeal,
     ),
-    _AdminPanelOption(
-      title: 'Role Control',
-      subtitle: 'Assign and audit user permissions.',
-      icon: Icons.admin_panel_settings_rounded,
-      color: _AdminPalette.roleControlCyan,
-    ),
   ];
 
   @override
@@ -212,19 +213,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     }
 
     if (option.title == 'Resource Screen') {
-      if (_isLocalAdmin) {
-        _showSnackBar(
-          'Local admin mode has no backend session. Use a Supabase admin account to manage resources.',
-        );
-        return;
-      }
-
       await Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => ResourcesStandaloneScreen(
-            currentRole: UserRole.admin,
-            isLocalAdmin: _isLocalAdmin,
-          ),
+          builder: (_) => const AdminResourcesScreen(),
         ),
       );
       return;
@@ -311,6 +302,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => const AdminClassSchedulerScreen(),
+        ),
+      );
+      return;
+    }
+
+    if (option.title == 'Role Control') {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const AdminUserManagementScreen(),
         ),
       );
       return;

@@ -86,9 +86,9 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     }
   }
 
-  bool get _isAdmin => _role == UserRole.admin && !_isLocalAdmin;
+  bool get _isAdmin => _role == UserRole.admin;
 
-  bool get _canSubmit => _currentUserId != null && !_isLocalAdmin;
+  bool get _canSubmit => _currentUserId != null && !_isLocalAdmin && !_isAdmin;
 
   List<FeedbackEntry> _filterEntries(List<FeedbackEntry> entries) {
     final query = _searchController.text.trim().toLowerCase();
@@ -169,6 +169,34 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
           _isSubmitting = false;
         });
       }
+    }
+  }
+
+  Future<void> _deleteFeedback(FeedbackEntry entry) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Feedback?'),
+        content: Text('Permanently remove "${entry.title}"?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    try {
+      await _service.deleteFeedback(feedbackId: entry.id);
+      if (mounted) _showSnackBar('Feedback deleted.');
+    } catch (e) {
+      if (mounted) _showSnackBar('Delete failed: $e');
     }
   }
 
@@ -756,6 +784,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
           entry: entry,
           isAdmin: _isAdmin,
           onRespond: _isAdmin ? () => _respondToFeedback(entry) : null,
+          onDelete: _isAdmin ? () => _deleteFeedback(entry) : null,
         );
       },
     );
@@ -767,270 +796,179 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
       builder: (context, snapshot) {
         final feedback = snapshot.data ?? const <FeedbackEntry>[];
         final respondedCount =
-            feedback.where((entry) => entry.status != FeedbackStatus.pending).length;
-        final anonymousCount = feedback.where((entry) => entry.isAnonymous).length;
+            feedback.where((e) => e.status != FeedbackStatus.pending).length;
+        final anonymousCount = feedback.where((e) => e.isAnonymous).length;
         final avgRating = feedback.isEmpty
             ? 0.0
-            : feedback.map((entry) => entry.rating).reduce((a, b) => a + b) /
+            : feedback.map((e) => e.rating).reduce((a, b) => a + b) /
                 feedback.length;
+        final filtered = _filterEntries(feedback);
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
-              child: _HeaderBlock(
-                title: 'Feedback Management',
-                subtitle: 'Monitor and respond to student feedback and suggestions.',
-                icon: Icons.admin_panel_settings_rounded,
+        return CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+                child: _HeaderBlock(
+                  title: 'Feedback Management',
+                  subtitle:
+                      'Monitor and respond to student feedback and suggestions.',
+                  icon: Icons.admin_panel_settings_rounded,
+                ),
               ),
             ),
-            Padding(
+            SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final cardWidth = constraints.maxWidth < 700
-                      ? (constraints.maxWidth - 10) / 2
-                      : (constraints.maxWidth - 30) / 4;
-
-                  return Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      SizedBox(
-                        width: cardWidth,
-                        child: _StatCard(
-                          title: 'Total Feedback',
-                          value: feedback.length.toString(),
-                          icon: Icons.rate_review_outlined,
-                          color: const Color(0xFF4F9EFF),
-                        ),
-                      ),
-                      SizedBox(
-                        width: cardWidth,
-                        child: _StatCard(
-                          title: 'Responded',
-                          value: respondedCount.toString(),
-                          icon: Icons.reply_rounded,
-                          color: const Color(0xFF10B981),
-                        ),
-                      ),
-                      SizedBox(
-                        width: cardWidth,
-                        child: _StatCard(
-                          title: 'Avg Rating',
-                          value: avgRating.toStringAsFixed(1),
-                          icon: Icons.star_rounded,
-                          color: const Color(0xFFF59E0B),
-                        ),
-                      ),
-                      SizedBox(
-                        width: cardWidth,
-                        child: _StatCard(
-                          title: 'Anonymous',
-                          value: anonymousCount.toString(),
-                          icon: Icons.visibility_off_rounded,
-                          color: const Color(0xFF8B5CF6),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final isCompact = constraints.maxWidth < 720;
-
-                  return ClipRRect(
-                    borderRadius: BorderRadius.circular(18),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.84),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: Colors.white.withOpacity(0.95)),
-                        ),
-                        child: isCompact
-                            ? Column(
-                                children: [
-                                  TextField(
-                                    controller: _searchController,
-                                    onChanged: (_) => setState(() {}),
-                                    decoration: const InputDecoration(
-                                      hintText: 'Search feedback...',
-                                      prefixIcon: Icon(Icons.search_rounded),
-                                      border: OutlineInputBorder(),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  DropdownButtonFormField<String>(
-                                    initialValue: _selectedCategoryFilter,
-                                    decoration: const InputDecoration(
-                                      border: OutlineInputBorder(),
-                                    ),
-                                    items: const [
-                                      DropdownMenuItem(
-                                        value: 'All Categories',
-                                        child: Text('All Categories'),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 'Academic',
-                                        child: Text('Academic'),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 'Technical',
-                                        child: Text('Technical'),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 'General',
-                                        child: Text('General'),
-                                      ),
-                                    ],
-                                    onChanged: (value) {
-                                      if (value == null) {
-                                        return;
-                                      }
-                                      setState(() {
-                                        _selectedCategoryFilter = value;
-                                      });
-                                    },
-                                  ),
-                                  const SizedBox(height: 12),
-                                  DropdownButtonFormField<FeedbackStatus?>(
-                                    initialValue: _selectedStatusFilter,
-                                    decoration: const InputDecoration(
-                                      border: OutlineInputBorder(),
-                                    ),
-                                    items: const [
-                                      DropdownMenuItem(
-                                        value: null,
-                                        child: Text('All Status'),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: FeedbackStatus.pending,
-                                        child: Text('Pending'),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: FeedbackStatus.responded,
-                                        child: Text('Responded'),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: FeedbackStatus.resolved,
-                                        child: Text('Resolved'),
-                                      ),
-                                    ],
-                                    onChanged: (value) {
-                                      setState(() {
-                                        _selectedStatusFilter = value;
-                                      });
-                                    },
-                                  ),
-                                ],
-                              )
-                            : Row(
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _searchController,
-                                      onChanged: (_) => setState(() {}),
-                                      decoration: const InputDecoration(
-                                        hintText: 'Search feedback...',
-                                        prefixIcon: Icon(Icons.search_rounded),
-                                        border: OutlineInputBorder(),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  SizedBox(
-                                    width: 170,
-                                    child: DropdownButtonFormField<String>(
-                                      initialValue: _selectedCategoryFilter,
-                                      decoration: const InputDecoration(
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      items: const [
-                                        DropdownMenuItem(
-                                          value: 'All Categories',
-                                          child: Text('All Categories'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: 'Academic',
-                                          child: Text('Academic'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: 'Technical',
-                                          child: Text('Technical'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: 'General',
-                                          child: Text('General'),
-                                        ),
-                                      ],
-                                      onChanged: (value) {
-                                        if (value == null) {
-                                          return;
-                                        }
-                                        setState(() {
-                                          _selectedCategoryFilter = value;
-                                        });
-                                      },
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  SizedBox(
-                                    width: 160,
-                                    child: DropdownButtonFormField<FeedbackStatus?>(
-                                      initialValue: _selectedStatusFilter,
-                                      decoration: const InputDecoration(
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      items: const [
-                                        DropdownMenuItem(
-                                          value: null,
-                                          child: Text('All Status'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: FeedbackStatus.pending,
-                                          child: Text('Pending'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: FeedbackStatus.responded,
-                                          child: Text('Responded'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: FeedbackStatus.resolved,
-                                          child: Text('Resolved'),
-                                        ),
-                                      ],
-                                      onChanged: (value) {
-                                        setState(() {
-                                          _selectedStatusFilter = value;
-                                        });
-                                      },
-                                    ),
-                                  ),
-                                ],
-                              ),
+              sliver: SliverToBoxAdapter(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _StatCard(
+                        title: 'Total',
+                        value: feedback.length.toString(),
+                        icon: Icons.rate_review_outlined,
+                        color: const Color(0xFF4F9EFF),
                       ),
                     ),
-                  );
-                },
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _StatCard(
+                        title: 'Responded',
+                        value: respondedCount.toString(),
+                        icon: Icons.reply_rounded,
+                        color: const Color(0xFF10B981),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _StatCard(
+                        title: 'Avg ★',
+                        value: avgRating.toStringAsFixed(1),
+                        icon: Icons.star_rounded,
+                        color: const Color(0xFFF59E0B),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _StatCard(
+                        title: 'Anon',
+                        value: anonymousCount.toString(),
+                        icon: Icons.visibility_off_rounded,
+                        color: const Color(0xFF8B5CF6),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: _buildFeedbackList(
-                entries: feedback,
-                emptyTitle: 'No feedback found',
-                emptySubtitle: 'No feedback matches your current filters.',
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              sliver: SliverToBoxAdapter(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.84),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.white.withOpacity(0.95)),
+                      ),
+                      child: Column(
+                        children: [
+                          TextField(
+                            controller: _searchController,
+                            onChanged: (_) => setState(() {}),
+                            decoration: const InputDecoration(
+                              hintText: 'Search feedback...',
+                              prefixIcon: Icon(Icons.search_rounded),
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  value: _selectedCategoryFilter,
+                                  decoration: const InputDecoration(
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                  ),
+                                  items: const [
+                                    DropdownMenuItem(value: 'All Categories', child: Text('All Categories')),
+                                    DropdownMenuItem(value: 'Academic', child: Text('Academic')),
+                                    DropdownMenuItem(value: 'Technical', child: Text('Technical')),
+                                    DropdownMenuItem(value: 'General', child: Text('General')),
+                                  ],
+                                  onChanged: (v) {
+                                    if (v != null) setState(() => _selectedCategoryFilter = v);
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: DropdownButtonFormField<FeedbackStatus?>(
+                                  value: _selectedStatusFilter,
+                                  decoration: const InputDecoration(
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                  ),
+                                  items: const [
+                                    DropdownMenuItem(value: null, child: Text('All Status')),
+                                    DropdownMenuItem(value: FeedbackStatus.pending, child: Text('Pending')),
+                                    DropdownMenuItem(value: FeedbackStatus.responded, child: Text('Responded')),
+                                    DropdownMenuItem(value: FeedbackStatus.resolved, child: Text('Resolved')),
+                                  ],
+                                  onChanged: (v) => setState(() => _selectedStatusFilter = v),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
+            const SliverToBoxAdapter(child: SizedBox(height: 10)),
+            if (filtered.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.chat_bubble_outline_rounded,
+                          size: 36, color: Color(0xFF94A3B8)),
+                      const SizedBox(height: 10),
+                      const Text('No feedback found',
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 6),
+                      Text('No feedback matches your current filters.',
+                          style: TextStyle(color: Colors.grey.shade600)),
+                    ],
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                sliver: SliverList.separated(
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (_, i) => _FeedbackCard(
+                    entry: filtered[i],
+                    isAdmin: true,
+                    onRespond: () => _respondToFeedback(filtered[i]),
+                    onDelete: () => _deleteFeedback(filtered[i]),
+                  ),
+                ),
+              ),
           ],
         );
       },
@@ -1178,11 +1116,13 @@ class _FeedbackCard extends StatelessWidget {
     required this.entry,
     required this.isAdmin,
     this.onRespond,
+    this.onDelete,
   });
 
   final FeedbackEntry entry;
   final bool isAdmin;
   final VoidCallback? onRespond;
+  final VoidCallback? onDelete;
 
   Color get _statusColor {
     switch (entry.status) {
@@ -1253,11 +1193,37 @@ class _FeedbackCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  if (isAdmin && onRespond != null)
-                    TextButton.icon(
-                      onPressed: onRespond,
-                      icon: const Icon(Icons.reply_rounded),
-                      label: const Text('Respond'),
+                  if (isAdmin)
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert_rounded,
+                          color: Color(0xFF64748B)),
+                      onSelected: (v) {
+                        if (v == 'respond') onRespond?.call();
+                        if (v == 'delete') onDelete?.call();
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(
+                            value: 'respond',
+                            child: Row(
+                              children: [
+                                Icon(Icons.reply_rounded, size: 18),
+                                SizedBox(width: 8),
+                                Text('Respond'),
+                              ],
+                            )),
+                        PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete_outline_rounded,
+                                    size: 18, color: Colors.redAccent),
+                                SizedBox(width: 8),
+                                Text('Delete',
+                                    style:
+                                        TextStyle(color: Colors.redAccent)),
+                              ],
+                            )),
+                      ],
                     ),
                 ],
               ),

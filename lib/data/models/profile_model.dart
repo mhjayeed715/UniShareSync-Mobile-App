@@ -11,6 +11,7 @@ class ProfileModel {
     this.semester,
     this.designation,
     this.avatarUrl,
+    this.isActive = true,
   });
 
   final String id;
@@ -22,6 +23,7 @@ class ProfileModel {
   final String? semester;
   final String? designation;
   final String? avatarUrl;
+  final bool isActive;
 
   ProfileModel copyWith({
     String? id,
@@ -33,6 +35,7 @@ class ProfileModel {
     String? semester,
     String? designation,
     String? avatarUrl,
+    bool? isActive,
   }) {
     return ProfileModel(
       id: id ?? this.id,
@@ -44,6 +47,7 @@ class ProfileModel {
       semester: semester ?? this.semester,
       designation: designation ?? this.designation,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      isActive: isActive ?? this.isActive,
     );
   }
 
@@ -58,6 +62,7 @@ class ProfileModel {
       'semester': semester,
       'designation': designation,
       'avatar_url': avatarUrl,
+      'is_active': isActive,
       'updated_at': DateTime.now().toIso8601String(),
     };
   }
@@ -73,6 +78,7 @@ class ProfileModel {
       semester: map['semester']?.toString(),
       designation: map['designation']?.toString(),
       avatarUrl: map['avatar_url']?.toString(),
+      isActive: map['is_active'] as bool? ?? true,
     );
   }
 }

@@ -69,6 +69,10 @@ class FeedbackService {
     return FeedbackEntry.fromMap(Map<String, dynamic>.from(inserted));
   }
 
+  Future<void> deleteFeedback({required String feedbackId}) async {
+    await _client.from('feedback_entries').delete().eq('id', feedbackId);
+  }
+
   Future<void> respondToFeedback({
     required String feedbackId,
     required String response,
