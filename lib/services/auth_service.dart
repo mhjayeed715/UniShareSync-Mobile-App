@@ -70,8 +70,18 @@ class AuthService {
   String? get currentUserId => _client.auth.currentUser?.id;
 
   Future<void> signUp(SignUpPayload payload) async {
+    final normalizedEmail = payload.email.trim().toLowerCase();
+    // Block signup if a deactivated profile exists for this email
+    final existing = await _client
+        .from('profiles')
+        .select('is_active')
+        .eq('email', normalizedEmail)
+        .maybeSingle();
+    if (existing != null && existing['is_active'] == false) {
+      throw StateError('This email is associated with a deactivated account. Please contact an administrator.');
+    }
     await _client.auth.signUp(
-      email: payload.email.trim().toLowerCase(),
+      email: normalizedEmail,
       password: payload.password,
       data: payload.toMetadata(),
     );
@@ -95,6 +105,12 @@ class AuthService {
     await _localSessionStore.setLocalAdminSignedIn(false);
 
     final profile = await _profileService.getCurrentProfile();
+
+    if (profile != null && !profile.isActive) {
+      await _client.auth.signOut();
+      throw StateError('This account has been deactivated. Please contact an administrator.');
+    }
+
     final role = profile?.role ??
         UserRole.fromString(user.userMetadata?['role']?.toString());
 
@@ -251,6 +267,12 @@ class AuthService {
     await _localSessionStore.setLocalAdminSignedIn(false);
 
     final profile = await _profileService.getCurrentProfile();
+
+    if (profile != null && !profile.isActive) {
+      await _client.auth.signOut();
+      throw StateError('Your account has been deactivated. Please contact an administrator.');
+    }
+
     final resolvedRole = profile?.role ??
         UserRole.fromString(
             authResponse.user?.userMetadata?['role']?.toString());

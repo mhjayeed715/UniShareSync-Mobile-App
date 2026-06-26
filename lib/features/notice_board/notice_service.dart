@@ -48,16 +48,29 @@ class NoticeService {
         .order('created_at', ascending: false)
         .limit(limit)
         .asyncMap((rows) async {
-          final notices = rows.map(NoticeModel.fromMap).toList(growable: false);
+          var notices = rows.map(NoticeModel.fromMap).toList(growable: false);
           print('DEBUG: Total notices from DB: ${notices.length}');
           for (var n in notices) {
             print('DEBUG: Notice "${n.title}" - target_roles: ${n.targetRoles}');
           }
-          final filtered = await _filterNoticesByUserRole(notices);
-          print('DEBUG: Filtered notices: ${filtered.length}');
+          // Filter by role/semester first
+          var filtered = await _filterNoticesByUserRole(notices);
+          // Then sort by priority (Urgent > Important > Normal) and newest first
+          filtered.sort((a, b) {
+            int priorityCmp = _priorityValue(b.priority) - _priorityValue(a.priority);
+            if (priorityCmp != 0) return priorityCmp;
+            return b.createdAt.compareTo(a.createdAt);
+          });
+          print('DEBUG: Filtered & sorted notices: ${filtered.length}');
           return filtered;
         });
   }
+
+  int _priorityValue(NoticePriority p) => switch (p) {
+        NoticePriority.urgent => 3,
+        NoticePriority.important => 2,
+        NoticePriority.normal => 1,
+      };
 
   // ── Realtime stream WITHOUT filtering (for admin) ────────────────────────
   Stream<List<NoticeModel>> watchAllNotices({int limit = 50}) {
@@ -66,7 +79,15 @@ class NoticeService {
         .stream(primaryKey: const ['id'])
         .order('created_at', ascending: false)
         .limit(limit)
-        .map((rows) => rows.map(NoticeModel.fromMap).toList(growable: false));
+        .asyncMap((rows) async {
+          var notices = rows.map(NoticeModel.fromMap).toList(growable: false);
+          notices.sort((a, b) {
+            int priorityCmp = _priorityValue(b.priority) - _priorityValue(a.priority);
+            if (priorityCmp != 0) return priorityCmp;
+            return b.createdAt.compareTo(a.createdAt);
+          });
+          return notices;
+        });
   }
 
   // ── Read with role-based filtering ───────────────────────────────────────
@@ -76,8 +97,16 @@ class NoticeService {
         .select()
         .order('created_at', ascending: false)
         .limit(limit);
-    final notices = (rows as List).map((r) => NoticeModel.fromMap(r)).toList();
-    return await _filterNoticesByUserRole(notices);
+    var notices = (rows as List).map((r) => NoticeModel.fromMap(r)).toList();
+    // Filter by role/semester first
+    notices = await _filterNoticesByUserRole(notices);
+    // Then sort by priority (Urgent > Important > Normal) and newest first
+    notices.sort((a, b) {
+      int priorityCmp = _priorityValue(b.priority) - _priorityValue(a.priority);
+      if (priorityCmp != 0) return priorityCmp;
+      return b.createdAt.compareTo(a.createdAt);
+    });
+    return notices;
   }
 
   // ── Read WITHOUT filtering (for admin) ──────────────────────────────────

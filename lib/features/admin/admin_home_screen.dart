@@ -13,7 +13,12 @@ import 'package:unisharesync_mobile_app/features/admin/admin_user_management_scr
 import 'package:unisharesync_mobile_app/features/feedback/feedback_screen.dart';
 import 'package:unisharesync_mobile_app/features/lost_found/lost_found_screen.dart';
 import 'package:unisharesync_mobile_app/features/profile/profile_management_screen.dart';
+import 'package:unisharesync_mobile_app/features/admin/admin_analytics_screen.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_resources_screen.dart';
+import 'package:unisharesync_mobile_app/features/admin/admin_settings_screen.dart';
+import 'package:unisharesync_mobile_app/features/ai_chat/ai_chat_screen.dart';
+import 'package:unisharesync_mobile_app/features/bus_tracker/bus_tracker_screen.dart';
+import 'package:unisharesync_mobile_app/features/notification_center/notification_center_screen.dart';
 import 'package:unisharesync_mobile_app/services/auth_service.dart';
 
 class AdminHomeScreen extends StatefulWidget {
@@ -45,17 +50,20 @@ class _AdminPalette {
   static const Color feedbackIndigo = Color(0xFF6366F1);
   static const Color notificationSky = Color(0xFF0EA5E9);
   static const Color aiAssistantViolet = Color(0xFF7C3AED);
+  static const Color analyticsRose = Color(0xFFEC4899);
   static const Color roleControlCyan = Color(0xFF06B6D4);
 }
 
 class _AdminPanelOption {
   const _AdminPanelOption({
+    required this.id,
     required this.title,
     required this.subtitle,
     required this.icon,
     required this.color,
   });
 
+  final String id;
   final String title;
   final String subtitle;
   final IconData icon;
@@ -70,84 +78,110 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   bool _isSigningOut = false;
   ProfileModel? _profile;
 
-  static const List<_AdminPanelOption> _options = [
+  static const List<_AdminPanelOption> _overviewOptions = [
     _AdminPanelOption(
+      id: 'analytics',
+      title: 'Analytics',
+      subtitle: 'Downloads, users & bus routes.',
+      icon: Icons.insights_rounded,
+      color: _AdminPalette.analyticsRose,
+    ),
+    _AdminPanelOption(
+      id: 'role_control',
       title: 'Role Control',
-      subtitle: 'Assign and audit user permissions.',
+      subtitle: 'Assign and audit permissions.',
       icon: Icons.admin_panel_settings_rounded,
       color: _AdminPalette.roleControlCyan,
     ),
     _AdminPanelOption(
+      id: 'profile',
       title: 'Profile',
       subtitle: 'Manage admin profile details.',
       icon: Icons.person_outline_rounded,
       color: _AdminPalette.authBlue,
     ),
+  ];
+
+  static const List<_AdminPanelOption> _contentOptions = [
     _AdminPanelOption(
-      title: 'Settings',
-      subtitle: 'Global app controls and preferences.',
-      icon: Icons.settings_outlined,
-      color: _AdminPalette.settingsSlate,
-    ),
-    _AdminPanelOption(
-      title: 'Resource Screen',
-      subtitle: 'Review and manage learning resources.',
+      id: 'resources',
+      title: 'Resources',
+      subtitle: 'Review and manage uploads.',
       icon: Icons.menu_book_rounded,
       color: _AdminPalette.resourcesBlue,
     ),
     _AdminPanelOption(
-      title: 'Notice Board Screen',
-      subtitle: 'Publish and moderate campus notices.',
+      id: 'notices',
+      title: 'Notice Board',
+      subtitle: 'Publish and moderate notices.',
       icon: Icons.campaign_rounded,
       color: _AdminPalette.noticesAmber,
     ),
     _AdminPanelOption(
-      title: 'Projects Screen',
-      subtitle: 'Monitor project spaces and activity.',
+      id: 'projects',
+      title: 'Projects',
+      subtitle: 'Monitor project spaces.',
       icon: Icons.account_tree_rounded,
       color: _AdminPalette.projectsPurple,
     ),
     _AdminPanelOption(
-      title: 'Events and Clubs Screen',
-      subtitle: 'Approve and manage events and clubs.',
+      id: 'events_clubs',
+      title: 'Events & Clubs',
+      subtitle: 'Manage campus events and clubs.',
       icon: Icons.celebration_rounded,
       color: _AdminPalette.eventsEmerald,
     ),
     _AdminPanelOption(
-      title: 'Lost and Found Screen',
-      subtitle: 'Handle item reports and status updates.',
-      icon: Icons.search_rounded,
-      color: _AdminPalette.lostFoundSoftRed,
-    ),
-    _AdminPanelOption(
-      title: 'Feedback Screen',
-      subtitle: 'Review user feedback and reports.',
-      icon: Icons.rate_review_outlined,
-      color: _AdminPalette.feedbackIndigo,
-    ),
-    _AdminPanelOption(
-      title: 'Notification Center',
-      subtitle: 'Broadcast and track notifications.',
-      icon: Icons.notifications_active_outlined,
-      color: _AdminPalette.notificationSky,
-    ),
-    _AdminPanelOption(
+      id: 'scheduler',
       title: 'Class Scheduler',
-      subtitle: 'Configure schedules and academic slots.',
+      subtitle: 'Configure academic schedules.',
       icon: Icons.calendar_view_week_rounded,
       color: _AdminPalette.authTeal,
     ),
     _AdminPanelOption(
-      title: 'AI Campus Assistant',
-      subtitle: 'Manage assistant behavior and prompts.',
+      id: 'lost_found',
+      title: 'Lost & Found',
+      subtitle: 'Handle item reports.',
+      icon: Icons.search_rounded,
+      color: _AdminPalette.lostFoundSoftRed,
+    ),
+    _AdminPanelOption(
+      id: 'feedback',
+      title: 'Feedback',
+      subtitle: 'Review user suggestions.',
+      icon: Icons.rate_review_outlined,
+      color: _AdminPalette.feedbackIndigo,
+    ),
+  ];
+
+  static const List<_AdminPanelOption> _systemOptions = [
+    _AdminPanelOption(
+      id: 'notifications',
+      title: 'Notifications',
+      subtitle: 'Campus alerts and broadcasts.',
+      icon: Icons.notifications_active_outlined,
+      color: _AdminPalette.notificationSky,
+    ),
+    _AdminPanelOption(
+      id: 'ai_assistant',
+      title: 'AI Assistant',
+      subtitle: 'Campus assistant for admins.',
       icon: Icons.smart_toy_outlined,
       color: _AdminPalette.aiAssistantViolet,
     ),
     _AdminPanelOption(
+      id: 'bus_tracker',
       title: 'Bus Tracker',
-      subtitle: 'Oversee routes and transport updates.',
+      subtitle: 'Live routes and transport.',
       icon: Icons.directions_bus_rounded,
       color: _AdminPalette.busTrackerTeal,
+    ),
+    _AdminPanelOption(
+      id: 'settings',
+      title: 'Settings',
+      subtitle: 'UniShareSync admin preferences.',
+      icon: Icons.settings_outlined,
+      color: _AdminPalette.settingsSlate,
     ),
   ];
 
@@ -207,120 +241,124 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   Future<void> _openAdminModule(_AdminPanelOption option) async {
-    if (option.title == 'Profile') {
-      await _openProfile();
-      return;
-    }
-
-    if (option.title == 'Resource Screen') {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => const AdminResourcesScreen(),
-        ),
-      );
-      return;
-    }
-
-    if (option.title == 'Projects Screen') {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => const AdminProjectsScreen(),
-        ),
-      );
-      return;
-    }
-
-    if (option.title == 'Notice Board Screen') {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => const AdminNoticeBoardScreen(),
-        ),
-      );
-      return;
-    }
-
-    if (option.title == 'Lost and Found Screen') {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => LostFoundScreen(
-            initialRole: UserRole.admin,
-            isLocalAdmin: _isLocalAdmin,
-          ),
-        ),
-      );
-      return;
-    }
-
-    if (option.title == 'Feedback Screen') {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => FeedbackScreen(
-            initialRole: UserRole.admin,
-            isLocalAdmin: _isLocalAdmin,
-          ),
-        ),
-      );
-      return;
-    }
-
-    if (option.title == 'Events and Clubs Screen') {
-      final choice = await showDialog<String>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Manage Events & Clubs'),
-          content: const Text('Choose what to manage:'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, 'events'),
-              child: const Text('Events'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, 'clubs'),
-              child: const Text('Clubs'),
-            ),
-          ],
-        ),
-      );
-
-      if (choice == 'events') {
+    switch (option.id) {
+      case 'profile':
+        await _openProfile();
+        break;
+      case 'analytics':
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AdminAnalyticsScreen()),
+        );
+        break;
+      case 'resources':
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AdminResourcesScreen()),
+        );
+        break;
+      case 'projects':
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AdminProjectsScreen()),
+        );
+        break;
+      case 'notices':
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AdminNoticeBoardScreen()),
+        );
+        break;
+      case 'lost_found':
         await Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => const AdminEventsScreen(),
+            builder: (_) => LostFoundScreen(
+              initialRole: UserRole.admin,
+              isLocalAdmin: _isLocalAdmin,
+            ),
           ),
         );
-      } else if (choice == 'clubs') {
+        break;
+      case 'feedback':
         await Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => const AdminClubsScreen(),
+            builder: (_) => FeedbackScreen(
+              initialRole: UserRole.admin,
+              isLocalAdmin: _isLocalAdmin,
+            ),
           ),
         );
-      }
-      return;
+        break;
+      case 'events_clubs':
+        final choice = await showDialog<String>(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Text('Manage Events & Clubs'),
+            content: const Text('Choose what to manage:'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, 'events'),
+                child: const Text('Events'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, 'clubs'),
+                child: const Text('Clubs'),
+              ),
+            ],
+          ),
+        );
+        if (!mounted) return;
+        if (choice == 'events') {
+          await Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AdminEventsScreen()),
+          );
+        } else if (choice == 'clubs') {
+          await Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AdminClubsScreen()),
+          );
+        }
+        break;
+      case 'scheduler':
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const AdminClassSchedulerScreen(),
+          ),
+        );
+        break;
+      case 'role_control':
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const AdminUserManagementScreen(),
+          ),
+        );
+        break;
+      case 'notifications':
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const NotificationCenterScreen(),
+          ),
+        );
+        break;
+      case 'ai_assistant':
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AiChatScreen()),
+        );
+        break;
+      case 'bus_tracker':
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => BusTrackerScreen(
+              currentUserName:
+                  _profile?.fullName ?? 'UniShareSync Admin',
+            ),
+          ),
+        );
+        break;
+      case 'settings':
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AdminSettingsScreen()),
+        );
+        break;
     }
-
-    if (option.title == 'Class Scheduler') {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => const AdminClassSchedulerScreen(),
-        ),
-      );
-      return;
-    }
-
-    if (option.title == 'Role Control') {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => const AdminUserManagementScreen(),
-        ),
-      );
-      return;
-    }
-
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => _AdminModuleScreen(option: option),
-      ),
-    );
   }
 
   Future<void> _signOut() async {
@@ -354,7 +392,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: const Text(
-          'Admin Control Center',
+          'UniShareSync Admin',
           style: TextStyle(
             color: Color(0xFF0F172A),
             fontWeight: FontWeight.w800,
@@ -425,33 +463,26 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         profile: _profile,
                         isLocalAdmin: _isLocalAdmin,
                       ),
-                      const SizedBox(height: 14),
-                      const Text(
-                        'Complete Admin Panel Options',
-                        style: TextStyle(
-                          color: Color(0xFF334155),
-                          fontWeight: FontWeight.w800,
-                        ),
+                      const SizedBox(height: 16),
+                      const _AdminSectionLabel(title: 'Overview'),
+                      const SizedBox(height: 8),
+                      _AdminOptionsGrid(
+                        options: _overviewOptions,
+                        onTap: _openAdminModule,
                       ),
-                      const SizedBox(height: 10),
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 1.06,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                        ),
-                        itemCount: _options.length,
-                        itemBuilder: (context, index) {
-                          final option = _options[index];
-                          return _AdminOptionCard(
-                            option: option,
-                            onTap: () => _openAdminModule(option),
-                          );
-                        },
+                      const SizedBox(height: 16),
+                      const _AdminSectionLabel(title: 'Content & Campus'),
+                      const SizedBox(height: 8),
+                      _AdminOptionsGrid(
+                        options: _contentOptions,
+                        onTap: _openAdminModule,
+                      ),
+                      const SizedBox(height: 16),
+                      const _AdminSectionLabel(title: 'System'),
+                      const SizedBox(height: 8),
+                      _AdminOptionsGrid(
+                        options: _systemOptions,
+                        onTap: _openAdminModule,
                       ),
                     ],
                   ),
@@ -532,7 +563,7 @@ class _AdminHeroCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      'Admin',
+                      'UniShareSync Admin',
                       style: TextStyle(
                         color: _AdminPalette.authBlue,
                         fontWeight: FontWeight.w700,
@@ -560,7 +591,57 @@ class _AdminHeroCard extends StatelessWidget {
   }
 }
 
-class _AdminOptionCard extends StatelessWidget {
+class _AdminSectionLabel extends StatelessWidget {
+  const _AdminSectionLabel({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: const TextStyle(
+        color: Color(0xFF334155),
+        fontWeight: FontWeight.w800,
+        fontSize: 14,
+      ),
+    );
+  }
+}
+
+class _AdminOptionsGrid extends StatelessWidget {
+  const _AdminOptionsGrid({
+    required this.options,
+    required this.onTap,
+  });
+
+  final List<_AdminPanelOption> options;
+  final Future<void> Function(_AdminPanelOption option) onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 1.08,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+      ),
+      itemCount: options.length,
+      itemBuilder: (context, index) {
+        final option = options[index];
+        return _AdminOptionCard(
+          option: option,
+          onTap: () => onTap(option),
+        );
+      },
+    );
+  }
+}
+
+class _AdminOptionCard extends StatefulWidget {
   const _AdminOptionCard({
     required this.option,
     required this.onTap,
@@ -570,171 +651,89 @@ class _AdminOptionCard extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Material(
-          color: Colors.white.withOpacity(0.82),
-          child: InkWell(
-            onTap: onTap,
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withOpacity(0.95)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: option.color.withOpacity(0.14),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(option.icon, size: 19, color: option.color),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    option.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF0F172A),
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    option.subtitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.grey.shade700,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  State<_AdminOptionCard> createState() => _AdminOptionCardState();
 }
 
-class _AdminModuleScreen extends StatelessWidget {
-  const _AdminModuleScreen({required this.option});
-
-  final _AdminPanelOption option;
+class _AdminOptionCardState extends State<_AdminOptionCard> {
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _AdminPalette.scaffold,
-      appBar: AppBar(
-        title: Text(option.title),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-      ),
-      body: Stack(
-        children: [
-          const Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    _AdminPalette.authGradientStart,
-                    _AdminPalette.authGradientEnd,
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _pressed ? 0.96 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Material(
+              color: Colors.white.withOpacity(0.82),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withOpacity(0.95)),
+                  boxShadow: _pressed
+                      ? [
+                          BoxShadow(
+                            color: widget.option.color.withOpacity(0.18),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: widget.option.color
+                            .withOpacity(_pressed ? 0.22 : 0.14),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        widget.option.icon,
+                        size: 19,
+                        color: widget.option.color,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      widget.option.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      widget.option.subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
+                        fontSize: 12,
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
           ),
-          Positioned(
-            top: -70,
-            right: -50,
-            child: Container(
-              width: 210,
-              height: 210,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: option.color.withOpacity(0.14),
-              ),
-            ),
-          ),
-          SafeArea(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                    child: Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.82),
-                        borderRadius: BorderRadius.circular(18),
-                        border:
-                            Border.all(color: Colors.white.withOpacity(0.95)),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 64,
-                            height: 64,
-                            decoration: BoxDecoration(
-                              color: option.color.withOpacity(0.14),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Icon(option.icon,
-                                size: 32, color: option.color),
-                          ),
-                          const SizedBox(height: 14),
-                          Text(
-                            option.title,
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF0F172A),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            option.subtitle,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.grey.shade700,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'This admin module is ready for detailed feature integration.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 12.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

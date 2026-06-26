@@ -892,7 +892,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                             children: [
                               Expanded(
                                 child: DropdownButtonFormField<String>(
-                                  value: _selectedCategoryFilter,
+                                  initialValue: _selectedCategoryFilter,
                                   decoration: const InputDecoration(
                                     border: OutlineInputBorder(),
                                     isDense: true,
@@ -911,7 +911,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                               const SizedBox(width: 8),
                               Expanded(
                                 child: DropdownButtonFormField<FeedbackStatus?>(
-                                  value: _selectedStatusFilter,
+                                  initialValue: _selectedStatusFilter,
                                   decoration: const InputDecoration(
                                     border: OutlineInputBorder(),
                                     isDense: true,

@@ -112,7 +112,7 @@ class _LostFoundScreenState extends State<LostFoundScreen> {
 
   bool _canDeleteReport(LostFoundReport report) => _canManageReport(report);
 
-  Future<void> _openReportForm() async {
+  Future<void> _openReportForm({bool startWithCamera = false}) async {
     if (!_canCreateReport) {
       _showSnackBar(
         _isLocalAdmin
@@ -126,6 +126,7 @@ class _LostFoundScreenState extends State<LostFoundScreen> {
       MaterialPageRoute(
         builder: (_) => _LostFoundReportFormScreen(
           initialType: _selectedTypeFilter ?? LostFoundReportType.lost,
+          startWithCamera: startWithCamera,
         ),
       ),
     );
@@ -1235,9 +1236,13 @@ class _ReportDetailSheet extends StatelessWidget {
 }
 
 class _LostFoundReportFormScreen extends StatefulWidget {
-  const _LostFoundReportFormScreen({required this.initialType});
+  const _LostFoundReportFormScreen({
+    required this.initialType,
+    this.startWithCamera = false,
+  });
 
   final LostFoundReportType initialType;
+  final bool startWithCamera;
 
   @override
   State<_LostFoundReportFormScreen> createState() => _LostFoundReportFormScreenState();
@@ -1277,6 +1282,11 @@ class _LostFoundReportFormScreenState extends State<_LostFoundReportFormScreen> 
     super.initState();
     _reportType = widget.initialType;
     _dateController.text = _formatDate(_selectedDate);
+    if (widget.startWithCamera) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _takePhoto();
+      });
+    }
   }
 
   @override
@@ -1355,6 +1365,35 @@ class _LostFoundReportFormScreenState extends State<_LostFoundReportFormScreen> 
     setState(() {
       _photoBytes.addAll(bytes);
       _photoNames.addAll(names);
+    });
+  }
+
+  Future<void> _takePhoto() async {
+    if (_photoBytes.length >= 3) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You can upload up to three photos.')),
+      );
+      return;
+    }
+
+    final XFile? photo = await _imagePicker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 85,
+      preferredCameraDevice: CameraDevice.rear,
+    );
+
+    if (photo == null || !mounted) {
+      return;
+    }
+
+    final photoData = await photo.readAsBytes();
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _photoBytes.add(photoData);
+      _photoNames.add(photo.name);
     });
   }
 
@@ -1566,15 +1605,50 @@ class _LostFoundReportFormScreenState extends State<_LostFoundReportFormScreen> 
                       style: TextStyle(fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: _photoBytes.length >= 3 ? null : _pickPhotos,
-                      icon: const Icon(Icons.photo_library_outlined),
-                      label: const Text('Choose Photos'),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: _photoBytes.length >= 3 ? null : _takePhoto,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF4F9EFF),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            icon: const Icon(Icons.camera_alt_rounded, size: 20),
+                            label: const Text(
+                              'Take Photo',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _photoBytes.length >= 3 ? null : _pickPhotos,
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              side: const BorderSide(color: Color(0xFF4F9EFF)),
+                            ),
+                            icon: const Icon(Icons.photo_library_outlined, size: 20),
+                            label: const Text(
+                              'Gallery',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     if (_photoBytes.isEmpty)
                       Text(
-                        'Up to three photos supported.',
+                        'Up to 3 photos. Use camera for instant capture or gallery for existing photos.',
                         style: TextStyle(
                           color: Colors.grey.shade600,
                           fontSize: 12,

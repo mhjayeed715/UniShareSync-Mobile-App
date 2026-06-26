@@ -114,7 +114,7 @@ class _AdminClassSchedulerScreenState extends State<AdminClassSchedulerScreen> {
   }
 
   Future<void> _importCsv() async {
-    final routineResult = await FilePicker.platform.pickFiles(
+    final routineResult = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['csv'],
       withData: kIsWeb,
@@ -165,7 +165,7 @@ class _AdminClassSchedulerScreenState extends State<AdminClassSchedulerScreen> {
     );
 
     if (attachCourse == true) {
-      final courseResult = await FilePicker.platform.pickFiles(
+      final courseResult = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: const ['csv'],
         withData: kIsWeb,

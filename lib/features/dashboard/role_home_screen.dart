@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:unisharesync_mobile_app/data/models/dashboard_feed_item.dart';
 import 'package:unisharesync_mobile_app/data/models/profile_model.dart';
 import 'package:unisharesync_mobile_app/data/models/user_role.dart';
@@ -74,6 +75,7 @@ class RoleHomeScreen extends StatefulWidget {
 class _RoleHomeScreenState extends State<RoleHomeScreen> {
   final AuthService _authService = AuthService();
   final DashboardFeedService _dashboardFeedService = DashboardFeedService();
+  final SupabaseClient _supabase = Supabase.instance.client;
 
   bool _isLoading = true;
   bool _isSigningOut = false;
@@ -87,6 +89,18 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
   Timer? _clockTicker;
 
   late final Stream<List<DashboardFeedItem>> _resourceStream;
+
+  // Track notifications and notices unread status
+  List<Map<String, dynamic>> _notices = [];
+  List<Map<String, dynamic>> _noticeReads = [];
+  List<Map<String, dynamic>> _dismissedNotices = [];
+  List<Map<String, dynamic>> _systemNotifications = [];
+  bool _hasUnreadNotifications = false;
+
+  StreamSubscription? _noticesSubscription;
+  StreamSubscription? _noticeReadsSubscription;
+  StreamSubscription? _dismissedNoticesSubscription;
+  StreamSubscription? _systemNotificationsSubscription;
 
   @override
   void initState() {
@@ -102,6 +116,7 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
   @override
   void dispose() {
     _clockTicker?.cancel();
+    _cancelNotificationStreams();
     super.dispose();
   }
 
@@ -156,6 +171,11 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
         _profile = profile;
         _isLoading = false;
       });
+
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId != null && !_isLocalAdmin) {
+        _initNotificationStreams(userId);
+      }
     } catch (_) {
       if (!mounted) {
         return;
@@ -172,6 +192,8 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
       _isSigningOut = true;
     });
 
+    _cancelNotificationStreams();
+
     await _authService.signOut();
 
     if (!mounted) {
@@ -182,6 +204,108 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
       MaterialPageRoute(builder: (_) => const SignInScreen()),
       (route) => false,
     );
+  }
+
+  void _initNotificationStreams(String userId) {
+    _cancelNotificationStreams();
+
+    _noticesSubscription = _supabase
+        .from('notices')
+        .stream(primaryKey: const ['id'])
+        .order('created_at', ascending: false)
+        .limit(100)
+        .listen((data) {
+          _notices = data.cast<Map<String, dynamic>>();
+          _updateUnreadStatus();
+        });
+
+    _noticeReadsSubscription = _supabase
+        .from('notice_reads')
+        .stream(primaryKey: const ['id'])
+        .eq('user_id', userId)
+        .listen((data) {
+          _noticeReads = data.cast<Map<String, dynamic>>();
+          _updateUnreadStatus();
+        });
+
+    _dismissedNoticesSubscription = _supabase
+        .from('dismissed_notices')
+        .stream(primaryKey: const ['id'])
+        .eq('user_id', userId)
+        .listen((data) {
+          _dismissedNotices = data.cast<Map<String, dynamic>>();
+          _updateUnreadStatus();
+        });
+
+    _systemNotificationsSubscription = _supabase
+        .from('notifications')
+        .stream(primaryKey: const ['id'])
+        .eq('user_id', userId)
+        .listen((data) {
+          _systemNotifications = data.cast<Map<String, dynamic>>();
+          _updateUnreadStatus();
+        });
+  }
+
+  void _cancelNotificationStreams() {
+    _noticesSubscription?.cancel();
+    _noticeReadsSubscription?.cancel();
+    _dismissedNoticesSubscription?.cancel();
+    _systemNotificationsSubscription?.cancel();
+  }
+
+  bool _shouldShowNotice(Map<String, dynamic> notice, String userRole, int? userSemester) {
+    final targetRoles = (notice['target_roles'] as List?)?.cast<String>() ?? ['student', 'faculty', 'admin'];
+    final targetSemesters = (notice['target_semesters'] as List?)?.cast<int>() ?? [];
+
+    if (!targetRoles.contains(userRole)) {
+      return false;
+    }
+
+    if (targetSemesters.isEmpty) {
+      return true;
+    }
+
+    if (userSemester != null) {
+      return targetSemesters.contains(userSemester);
+    }
+
+    return userRole != 'student';
+  }
+
+  void _updateUnreadStatus() {
+    if (!mounted) return;
+
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) {
+      setState(() {
+        _hasUnreadNotifications = false;
+      });
+      return;
+    }
+
+    final hasUnreadSystem = _systemNotifications.any((n) => n['is_read'] == false);
+
+    final readNoticeIds = _noticeReads.map((r) => r['notice_id'].toString()).toSet();
+    final dismissedNoticeIds = _dismissedNotices.map((d) => d['notice_id'].toString()).toSet();
+
+    final userRole = _profile?.role.value ?? _role.value;
+    final userSemester = _profile?.semester != null
+        ? int.tryParse(_profile!.semester!.toString())
+        : null;
+
+    final hasUnreadNotice = _notices.any((notice) {
+      final noticeId = notice['id'].toString();
+
+      if (readNoticeIds.contains(noticeId)) return false;
+      if (dismissedNoticeIds.contains(noticeId)) return false;
+
+      return _shouldShowNotice(notice, userRole, userSemester);
+    });
+
+    setState(() {
+      _hasUnreadNotifications = hasUnreadSystem || hasUnreadNotice;
+    });
   }
 
   Future<void> _openProfileEditor() async {
@@ -427,6 +551,38 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
+  // Mark all notices as read
+  Future<void> _markAllNoticesAsRead() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    try {
+      // Fetch all notice IDs
+      final data = await _supabase.from('notices').select('id');
+      final ids = (data as List).map((e) => e['id'].toString()).toList();
+      // Upsert read records for each notice
+      await _supabase.from('notice_reads').upsert(
+        ids.map((id) => {
+          'notice_id': id,
+          'user_id': userId,
+          'read_at': DateTime.now().toIso8601String(),
+        }).toList(),
+        onConflict: 'notice_id,user_id',
+      );
+    } catch (_) {}
+  }
+
+  // Mark all system notifications as read
+  Future<void> _markAllSystemNotificationsAsRead() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    try {
+      await _supabase
+          .from('notifications')
+          .update({'is_read': true})
+          .eq('user_id', userId);
+    } catch (_) {}
+  }
+
   String _timeGreeting() {
     final hour = _now.hour;
 
@@ -523,12 +679,20 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
           greeting: '${_timeGreeting()}, ${_firstName()}',
           subtitle: _subtitleLine(),
           avatarUrl: _profile?.avatarUrl,
-          onNotificationTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const NotificationCenterScreen(),
-            ),
-          ),
+          onAvatarTap: _openProfileEditor,
+          hasUnread: _hasUnreadNotifications,
+          onNotificationTap: () async {
+            // Open notification center and mark all notices/system notifications as read on return
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const NotificationCenterScreen(),
+              ),
+            );
+            // Mark all unread notices and system notifications as read when returning to home
+            await _markAllNoticesAsRead();
+            await _markAllSystemNotificationsAsRead();
+          },
         ),
         const SizedBox(height: 14),
         _buildActivityOverviewCard(),
@@ -997,24 +1161,31 @@ class _DashboardHeader extends StatelessWidget {
     required this.subtitle,
     required this.avatarUrl,
     required this.onNotificationTap,
+    required this.onAvatarTap,
+    required this.hasUnread,
   });
 
   final String greeting;
   final String subtitle;
   final String? avatarUrl;
   final VoidCallback onNotificationTap;
+  final VoidCallback onAvatarTap;
+  final bool hasUnread;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        CircleAvatar(
-          radius: 24,
-          backgroundColor: const Color(0xFFDCEBFF),
-          backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl!) : null,
-          child: avatarUrl == null
-              ? const Icon(Icons.person, color: Color(0xFF2B5B94), size: 22)
-              : null,
+        GestureDetector(
+          onTap: onAvatarTap,
+          child: CircleAvatar(
+            radius: 24,
+            backgroundColor: const Color(0xFFDCEBFF),
+            backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl!) : null,
+            child: avatarUrl == null
+                ? const Icon(Icons.person, color: Color(0xFF2B5B94), size: 22)
+                : null,
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -1067,18 +1238,19 @@ class _DashboardHeader extends StatelessWidget {
                       color: Color(0xFF475569),
                     ),
                   ),
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: _DashboardPalette.authBlue,
-                        shape: BoxShape.circle,
+                  if (hasUnread)
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: _DashboardPalette.authBlue,
+                          shape: BoxShape.circle,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -1825,16 +1997,14 @@ class _SettingsRow extends StatelessWidget {
     required this.iconColor,
     required this.label,
     required this.onTap,
-    this.trailing,
-    this.isDestructive = false,
   });
 
   final IconData icon;
   final Color iconColor;
   final String label;
   final VoidCallback? onTap;
-  final Widget? trailing;
-  final bool isDestructive;
+  final Widget? trailing = null;
+  final bool isDestructive = false;
 
   @override
   Widget build(BuildContext context) {

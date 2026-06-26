@@ -27,32 +27,23 @@ class AdminUserManagementService {
     String? semester,
     String? designation,
   }) async {
-    final res = await _client.auth.admin.createUser(
-      AdminUserAttributes(
-        email: email.trim().toLowerCase(),
-        password: password,
-        emailConfirm: true,
-        userMetadata: {
-          'role': role.value,
-          'full_name': fullName,
-        },
-      ),
+    final res = await _client.functions.invoke(
+      'admin-create-user',
+      body: {
+        'email': email,
+        'password': password,
+        'fullName': fullName,
+        'role': role.value,
+        'department': department,
+        'studentId': studentId,
+        'semester': semester,
+        'designation': designation,
+      },
     );
-    final uid = res.user?.id;
-    if (uid == null) throw StateError('User creation failed.');
-
-    await _client.from('profiles').upsert({
-      'id': uid,
-      'email': email.trim().toLowerCase(),
-      'full_name': fullName,
-      'role': role.value,
-      'department': department,
-      'student_id': studentId,
-      'semester': semester,
-      'designation': designation,
-      'is_active': true,
-      'updated_at': DateTime.now().toIso8601String(),
-    });
+    if (res.status != 200) {
+      final msg = (res.data as Map?)?['error'] ?? 'User creation failed.';
+      throw StateError(msg.toString());
+    }
   }
 
   Future<void> updateUser(ProfileModel profile) async {
@@ -72,6 +63,11 @@ class AdminUserManagementService {
         .from('profiles')
         .update({'is_active': active, 'updated_at': DateTime.now().toIso8601String()})
         .eq('id', userId);
+    // Ban/unban in auth.users via a SECURITY DEFINER RPC (admin API requires service role key)
+    await _client.rpc('set_user_active', params: {
+      'target_user_id': userId,
+      'is_active': active,
+    });
   }
 
   Future<void> changeRole(String userId, UserRole newRole) async {

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "940839736695",
+    "project_id": "unisharesync-mobile-app",
+    "storage_bucket": "unisharesync-mobile-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:940839736695:android:d3506a8d0b57c5f3b33d72",
+        "android_client_info": {
+          "package_name": "com.unisharesync"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAL8iHzkiwX4ZW1YCKgsfAkt0mmJd5pPlE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

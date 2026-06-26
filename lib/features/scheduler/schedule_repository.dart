@@ -1,5 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
+// dart:io must NOT be imported directly on web – use the conditional shim.
+import 'schedule_io.dart' if (dart.library.html) 'schedule_io_web.dart';
 
 import 'package:csv/csv.dart';
 import 'package:flutter/services.dart';
@@ -52,9 +53,12 @@ class ScheduleRepository {
     required String routinePath,
     String? coursePath,
   }) async {
-    final routineCsv = await File(routinePath).readAsString();
+    // readFileAsString() comes from the conditional shim:
+    //   schedule_io.dart      (native: dart:io)
+    //   schedule_io_web.dart  (web: throws UnsupportedError – never called)
+    final routineCsv = await readFileAsString(routinePath);
     final courseCsv = coursePath != null
-        ? await File(coursePath).readAsString()
+        ? await readFileAsString(coursePath)
         : await rootBundle.loadString(_courseAssetPath);
     return importFromCsvStrings(
       routineCsv: routineCsv,
@@ -300,7 +304,7 @@ class ScheduleRepository {
   }
 
   List<List<String>> _csvToRows(String csv) {
-    final rows = const CsvToListConverter(shouldParseNumbers: false)
+    final rows = CsvToListConverter(shouldParseNumbers: false)
         .convert(csv)
         .map(
           (row) => row

@@ -138,12 +138,14 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return;
     try {
-      await _supabase.from('notice_reads').insert({
+      // Use upsert so a second tap won’t error and we can store when it was read
+      await _supabase.from('notice_reads').upsert({
         'notice_id': noticeId,
         'user_id': userId,
-      });
+        'read_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'notice_id,user_id');
     } catch (e) {
-      // Silently fail if already marked as read
+      // Silently ignore any unexpected error – the UI will stay consistent
     }
   }
 
@@ -188,6 +190,38 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
     } catch (_) {}
   }
 
+  // Mark all notices as read
+  Future<void> _markAllNoticesAsRead() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    try {
+      // Fetch all notice IDs
+      final data = await _supabase.from('notices').select('id');
+      final ids = (data as List).map((e) => e['id'].toString()).toList();
+      // Upsert read records for each notice
+      await _supabase.from('notice_reads').upsert(
+        ids.map((id) => {
+          'notice_id': id,
+          'user_id': userId,
+          'read_at': DateTime.now().toIso8601String(),
+        }).toList(),
+        onConflict: 'notice_id,user_id',
+      );
+    } catch (_) {}
+  }
+
+  // Mark all system notifications as read
+  Future<void> _markAllSystemNotificationsAsRead() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    try {
+      await _supabase
+          .from('notifications')
+          .update({'is_read': true})
+          .eq('user_id', userId);
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -201,6 +235,33 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
           style: TextStyle(
               color: Color(0xFF0F172A), fontWeight: FontWeight.w800),
         ),
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'mark_all') {
+                // Determine which tab is active
+                final tabController = DefaultTabController.of(context);
+                if (tabController.index == 0) {
+                  await _markAllNoticesAsRead();
+                } else {
+                  await _markAllSystemNotificationsAsRead();
+                }
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem<String>(
+                value: 'mark_all',
+                child: Row(
+                  children: [
+                    Icon(Icons.mark_email_read, size: 18, color: Color(0xFF4F9EFF)),
+                    SizedBox(width: 8),
+                    Text('Mark All as Read'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: Stack(
         children: [

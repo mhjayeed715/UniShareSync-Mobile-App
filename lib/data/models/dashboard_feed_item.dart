@@ -5,6 +5,7 @@ class DashboardFeedItem {
     this.subtitle,
     this.category,
     this.createdAt,
+    this.isRead = false,
   });
 
   final String id;
@@ -12,6 +13,7 @@ class DashboardFeedItem {
   final String? subtitle;
   final String? category;
   final DateTime? createdAt;
+  final bool isRead;
 
   factory DashboardFeedItem.fromResourceMap(Map<String, dynamic> map) {
     final title = _readString(

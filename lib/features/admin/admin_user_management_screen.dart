@@ -751,7 +751,7 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                 ],
                 const SizedBox(height: 10),
                 DropdownButtonFormField<UserRole>(
-                  value: _role,
+                  initialValue: _role,
                   decoration: InputDecoration(
                     labelText: 'Role',
                     prefixIcon: const Icon(Icons.admin_panel_settings_outlined),

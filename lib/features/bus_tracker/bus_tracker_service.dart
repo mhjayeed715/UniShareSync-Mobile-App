@@ -54,13 +54,13 @@ class BusTrackerService {
     final channelName =
         'bus-locations-${DateTime.now().millisecondsSinceEpoch}';
 
-    bool _isFresh(BusLocation loc) =>
+    bool isFresh(BusLocation loc) =>
         DateTime.now().toUtc().difference(loc.updatedAt).inSeconds <
         staleSeconds;
 
     void emit() {
       // Always prune before emitting — belt-and-suspenders
-      cache.removeWhere((_, loc) => !_isFresh(loc));
+      cache.removeWhere((_, loc) => !isFresh(loc));
       if (!controller.isClosed) controller.add(Map.from(cache));
     }
 
@@ -114,7 +114,7 @@ class BusTrackerService {
             final record = payload.newRecord;
             if (record.isNotEmpty) {
               final loc = BusLocation.fromMap(record);
-              if (_isFresh(loc)) {
+              if (isFresh(loc)) {
                 cache[loc.busId] = loc;
               } else {
                 cache.remove(loc.busId);

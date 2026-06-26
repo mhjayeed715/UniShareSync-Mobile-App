@@ -20,17 +20,31 @@ dependencies:
   shared_preferences: ^2.5.3
   webview_flutter: ^4.8.0
   url_launcher: ^6.3.1
-  file_picker: ^8.1.2
   http: ^1.2.0
-  flutter_map: ^7.0.2
+  file_picker: ^12.0.0-beta.7   # beta required for geolocator win32 compat
+  connectivity_plus: ^7.1.1   # latest version in lock file
+
+  flutter_map: ^8.3.0
   latlong2: ^0.9.1
-  geolocator: ^13.0.2
-  connectivity_plus: ^6.1.4
+  geolocator: ^14.0.3
+  fl_chart: ^1.2.0
+  firebase_core: ^3.13.0        # v3 avoids the PromiseJsImpl web breakage
+  firebase_messaging: ^15.2.5   # compatible with firebase_core v3
+
+  permission_handler: ^12.0.3
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: false
+  image_path: "lib/assets/icons/UniShareSync.png"
+  adaptive_icon_background: "#E8F5E8"
+  adaptive_icon_foreground: "lib/assets/icons/UniShareSync.png"
 
 flutter:
   uses-material-design: true

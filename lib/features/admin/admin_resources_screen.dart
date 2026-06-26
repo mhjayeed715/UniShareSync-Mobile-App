@@ -2,7 +2,6 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:unisharesync_mobile_app/data/models/resource_item.dart';
-import 'package:unisharesync_mobile_app/data/models/user_role.dart';
 import 'package:unisharesync_mobile_app/features/resources/resources_tab_view.dart'
     show showResourceUploadSheet;
 import 'package:unisharesync_mobile_app/services/resource_service.dart';
