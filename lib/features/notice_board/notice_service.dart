@@ -1,17 +1,21 @@
 import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:unisharesync_mobile_app/core/utils/image_compression.dart';
+import 'package:unisharesync_mobile_app/services/offline_cache_service.dart';
 import 'notice_model.dart';
+
+
+
 
 class NoticeService {
   NoticeService({SupabaseClient? client})
       : _client = client ?? Supabase.instance.client;
 
   final SupabaseClient _client;
+  final OfflineCacheService _cache = OfflineCacheService.instance;
 
-  String? get _currentUserRole => _client.auth.currentUser?.userMetadata?['role']?.toString();
+  String _cacheKey(String suffix) => 'notice_board_$suffix';
 
-  // ── Get current user's role and semester from profile ─────────────────────
   Future<Map<String, dynamic>> _getCurrentUserRoleAndSemester() async {
     try {
       final userId = _client.auth.currentUser?.id;
@@ -27,43 +31,80 @@ class NoticeService {
 
       if (profile != null) {
         final role = profile['role']?.toString() ?? 'student';
-        final semester = profile['semester'] != null 
-            ? int.tryParse(profile['semester'].toString()) 
+        final semester = profile['semester'] != null
+            ? int.tryParse(profile['semester'].toString())
             : null;
-        print('DEBUG: User role=$role, semester=$semester');
         return {'role': role, 'semester': semester};
       }
+
       return {'role': 'student', 'semester': null};
-    } catch (e) {
-      print('Error fetching user profile: $e');
+    } catch (_) {
       return {'role': 'student', 'semester': null};
     }
   }
 
-  // ── Realtime stream with role-based filtering (for regular users) ────────
-  Stream<List<NoticeModel>> watchNotices({int limit = 50}) {
-    return _client
-        .from('notices')
-        .stream(primaryKey: const ['id'])
-        .order('created_at', ascending: false)
-        .limit(limit)
-        .asyncMap((rows) async {
-          var notices = rows.map(NoticeModel.fromMap).toList(growable: false);
-          print('DEBUG: Total notices from DB: ${notices.length}');
-          for (var n in notices) {
-            print('DEBUG: Notice "${n.title}" - target_roles: ${n.targetRoles}');
-          }
-          // Filter by role/semester first
-          var filtered = await _filterNoticesByUserRole(notices);
-          // Then sort by priority (Urgent > Important > Normal) and newest first
-          filtered.sort((a, b) {
-            int priorityCmp = _priorityValue(b.priority) - _priorityValue(a.priority);
-            if (priorityCmp != 0) return priorityCmp;
-            return b.createdAt.compareTo(a.createdAt);
-          });
-          print('DEBUG: Filtered & sorted notices: ${filtered.length}');
-          return filtered;
+  Stream<List<NoticeModel>> watchNotices({int limit = 50}) async* {
+    final userId = _client.auth.currentUser?.id ?? 'guest';
+    final cacheKey = _cacheKey('notices_${userId}_$limit');
+    final cached = await _cache.readJsonList(cacheKey);
+
+    if (cached.isNotEmpty) {
+      yield await _filterNoticesByUserRole(
+        cached.map(NoticeModel.fromMap).toList(growable: false),
+      );
+    }
+
+    try {
+      await for (final rows in _client
+          .from('notices')
+          .stream(primaryKey: const ['id'])
+          .order('created_at', ascending: false)
+          .limit(limit)) {
+        await _cache.saveJsonList(cacheKey, rows);
+        final notices = rows.map(NoticeModel.fromMap).toList(growable: false);
+        final filtered = await _filterNoticesByUserRole(notices);
+        filtered.sort((a, b) {
+          final priorityCmp = _priorityValue(b.priority) - _priorityValue(a.priority);
+          if (priorityCmp != 0) return priorityCmp;
+          return b.createdAt.compareTo(a.createdAt);
         });
+        yield filtered;
+      }
+    } catch (_) {
+      if (cached.isEmpty) {
+        yield const <NoticeModel>[];
+      }
+    }
+  }
+
+  Stream<List<NoticeModel>> watchAllNotices({int limit = 50}) async* {
+    final cacheKey = _cacheKey('all_notices_$limit');
+    final cached = await _cache.readJsonList(cacheKey);
+
+    if (cached.isNotEmpty) {
+      yield cached.map(NoticeModel.fromMap).toList(growable: false);
+    }
+
+    try {
+      await for (final rows in _client
+          .from('notices')
+          .stream(primaryKey: const ['id'])
+          .order('created_at', ascending: false)
+          .limit(limit)) {
+        await _cache.saveJsonList(cacheKey, rows);
+        final notices = rows.map(NoticeModel.fromMap).toList(growable: false);
+        notices.sort((a, b) {
+          final priorityCmp = _priorityValue(b.priority) - _priorityValue(a.priority);
+          if (priorityCmp != 0) return priorityCmp;
+          return b.createdAt.compareTo(a.createdAt);
+        });
+        yield notices;
+      }
+    } catch (_) {
+      if (cached.isEmpty) {
+        yield const <NoticeModel>[];
+      }
+    }
   }
 
   int _priorityValue(NoticePriority p) => switch (p) {
@@ -72,97 +113,82 @@ class NoticeService {
         NoticePriority.normal => 1,
       };
 
-  // ── Realtime stream WITHOUT filtering (for admin) ────────────────────────
-  Stream<List<NoticeModel>> watchAllNotices({int limit = 50}) {
-    return _client
-        .from('notices')
-        .stream(primaryKey: const ['id'])
-        .order('created_at', ascending: false)
-        .limit(limit)
-        .asyncMap((rows) async {
-          var notices = rows.map(NoticeModel.fromMap).toList(growable: false);
-          notices.sort((a, b) {
-            int priorityCmp = _priorityValue(b.priority) - _priorityValue(a.priority);
-            if (priorityCmp != 0) return priorityCmp;
-            return b.createdAt.compareTo(a.createdAt);
-          });
-          return notices;
-        });
-  }
-
-  // ── Read with role-based filtering ───────────────────────────────────────
   Future<List<NoticeModel>> fetchNotices({int limit = 50}) async {
-    final rows = await _client
-        .from('notices')
-        .select()
-        .order('created_at', ascending: false)
-        .limit(limit);
-    var notices = (rows as List).map((r) => NoticeModel.fromMap(r)).toList();
-    // Filter by role/semester first
-    notices = await _filterNoticesByUserRole(notices);
-    // Then sort by priority (Urgent > Important > Normal) and newest first
-    notices.sort((a, b) {
-      int priorityCmp = _priorityValue(b.priority) - _priorityValue(a.priority);
-      if (priorityCmp != 0) return priorityCmp;
-      return b.createdAt.compareTo(a.createdAt);
-    });
-    return notices;
+    final cacheKey = _cacheKey('notices_${_client.auth.currentUser?.id ?? 'guest'}_$limit');
+    try {
+      final rows = await _client
+          .from('notices')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(limit);
+      final rawRows = (rows as List).cast<Map<String, dynamic>>();
+      await _cache.saveJsonList(cacheKey, rawRows);
+      var notices = rawRows.map(NoticeModel.fromMap).toList();
+      notices = await _filterNoticesByUserRole(notices);
+      notices.sort((a, b) {
+        final priorityCmp = _priorityValue(b.priority) - _priorityValue(a.priority);
+        if (priorityCmp != 0) return priorityCmp;
+        return b.createdAt.compareTo(a.createdAt);
+      });
+      return notices;
+    } catch (_) {
+      final cached = await _cache.readJsonList(cacheKey);
+      if (cached.isEmpty) {
+        return const <NoticeModel>[];
+      }
+
+      var notices = cached.map(NoticeModel.fromMap).toList();
+      notices = await _filterNoticesByUserRole(notices);
+      notices.sort((a, b) {
+        final priorityCmp = _priorityValue(b.priority) - _priorityValue(a.priority);
+        if (priorityCmp != 0) return priorityCmp;
+        return b.createdAt.compareTo(a.createdAt);
+      });
+      return notices;
+    }
   }
 
-  // ── Read WITHOUT filtering (for admin) ──────────────────────────────────
   Future<List<NoticeModel>> fetchAllNotices({int limit = 50}) async {
-    final rows = await _client
-        .from('notices')
-        .select()
-        .order('created_at', ascending: false)
-        .limit(limit);
-    return (rows as List).map((r) => NoticeModel.fromMap(r)).toList();
+    final cacheKey = _cacheKey('all_notices_$limit');
+    try {
+      final rows = await _client
+          .from('notices')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(limit);
+      final rawRows = (rows as List).cast<Map<String, dynamic>>();
+      await _cache.saveJsonList(cacheKey, rawRows);
+      return rawRows.map(NoticeModel.fromMap).toList();
+    } catch (_) {
+      final cached = await _cache.readJsonList(cacheKey);
+      return cached.map(NoticeModel.fromMap).toList();
+    }
   }
 
-  // ── Filter notices based on user role and semester ───────────────────────
   Future<List<NoticeModel>> _filterNoticesByUserRole(List<NoticeModel> notices) async {
     final userInfo = await _getCurrentUserRoleAndSemester();
     final userRole = userInfo['role'] as String;
     final userSemester = userInfo['semester'] as int?;
 
-    print('DEBUG: Filtering with userRole=$userRole, userSemester=$userSemester');
-
     final filtered = notices.where((notice) {
-      print('DEBUG: Checking notice "${notice.title}"');
-      print('  - targetRoles: ${notice.targetRoles}');
-      print('  - targetSemesters: ${notice.targetSemesters}');
-      print('  - userRole in targetRoles: ${notice.targetRoles.contains(userRole)}');
-
-      // Check if user's role is in target roles
       if (!notice.targetRoles.contains(userRole)) {
-        print('  - FILTERED OUT: role not in target');
         return false;
       }
 
-      // If target semesters is empty, show to all
       if (notice.targetSemesters.isEmpty) {
-        print('  - INCLUDED: no semester restriction');
         return true;
       }
 
-      // If target semesters is specified, check if user's semester matches
       if (userSemester != null) {
-        final included = notice.targetSemesters.contains(userSemester);
-        print('  - userSemester in targetSemesters: $included');
-        return included;
+        return notice.targetSemesters.contains(userSemester);
       }
 
-      // If user has no semester (faculty/admin), show all
-      final isNonStudent = userRole != 'student';
-      print('  - isNonStudent: $isNonStudent');
-      return isNonStudent;
+      return userRole != 'student';
     }).toList();
 
-    print('DEBUG: Final filtered count: ${filtered.length}');
     return filtered;
   }
 
-  // ── Create ───────────────────────────────────────────────────────────────
   Future<NoticeModel> createNotice({
     required String title,
     required String content,
@@ -178,8 +204,6 @@ class NoticeService {
       throw Exception('User not authenticated');
     }
 
-    print('DEBUG: Creating notice with targetRoles=$targetRoles, targetSemesters=$targetSemesters');
-
     String? attachmentUrl;
     String? attachmentType;
 
@@ -188,14 +212,11 @@ class NoticeService {
       attachmentType = ext == 'pdf' ? 'pdf' : 'image';
 
       if (attachmentType == 'pdf') {
-        final storagePath =
-            'notices/${DateTime.now().millisecondsSinceEpoch}_$attachmentFileName';
+        final storagePath = 'notices/${DateTime.now().millisecondsSinceEpoch}_$attachmentFileName';
         await _client.storage
             .from('notice_attachments')
             .uploadBinary(storagePath, attachmentBytes);
-        attachmentUrl = _client.storage
-            .from('notice_attachments')
-            .getPublicUrl(storagePath);
+        attachmentUrl = _client.storage.from('notice_attachments').getPublicUrl(storagePath);
       } else {
         final compressed = await ImageCompression.toWebp(
               attachmentBytes,
@@ -213,9 +234,7 @@ class NoticeService {
                 contentType: 'image/webp',
               ),
             );
-        attachmentUrl = _client.storage
-            .from('notice_attachments')
-            .getPublicUrl(storagePath);
+        attachmentUrl = _client.storage.from('notice_attachments').getPublicUrl(storagePath);
       }
     }
 
@@ -232,12 +251,9 @@ class NoticeService {
       targetSemesters: targetSemesters,
     );
 
-    final insertMap = notice.toInsertMap();
-    print('DEBUG: Insert map: $insertMap');
-
     final inserted = await _client
         .from('notices')
-        .insert(insertMap)
+        .insert(notice.toInsertMap())
         .select()
         .single();
 
@@ -249,10 +265,9 @@ class NoticeService {
       targetSemesters: targetSemesters,
     );
 
-    return NoticeModel.fromMap(inserted);
+    return NoticeModel.fromMap(Map<String, dynamic>.from(inserted));
   }
 
-  // ── Update ───────────────────────────────────────────────────────────────
   Future<void> updateNotice({
     required String id,
     required String title,
@@ -271,21 +286,15 @@ class NoticeService {
     }).eq('id', id);
   }
 
-  // ── Delete ───────────────────────────────────────────────────────────────
   Future<void> deleteNotice(String id) async {
     try {
-      final result = await _client
-          .from('notices')
-          .delete()
-          .eq('id', id);
-      print('Delete result: $result');
+      await _client.from('notices').delete().eq('id', id);
     } catch (e) {
       print('Delete error: $e');
       rethrow;
     }
   }
 
-  // ── FCM push via Supabase Edge Function ──────────────────────────────────
   Future<void> _sendPushNotification({
     required String title,
     required String body,
@@ -295,18 +304,18 @@ class NoticeService {
   }) async {
     try {
       await _client.functions.invoke(
-        'send-notice-push',
+        'send-push-notification',
         body: {
+          'type': 'notice',
           'title': title,
           'body': body,
-          'priority': priority.name,
-          'topic': 'campus_notices',
-          'target_roles': targetRoles,
-          'target_semesters': targetSemesters.isEmpty ? null : targetSemesters,
+          'targetRoles': targetRoles,
+          'targetSemesters': targetSemesters,
+          'data': {'priority': priority.name},
         },
       );
-    } catch (_) {
-      // Push failure should not block notice creation
+    } catch (e) {
+      print('ERROR [Push] Failed to invoke send-push-notification: $e');
     }
   }
 }

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -540,7 +539,12 @@ class _ResourcesTabViewState extends State<ResourcesTabView> {
 
   Widget _buildBody() {
     if (_isLoading && _visibleResources.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return ListView.separated(
+        padding: const EdgeInsets.fromLTRB(0, 2, 0, 118),
+        itemCount: 5,
+        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        itemBuilder: (_, __) => const _ResourceSkeletonCard(),
+      );
     }
 
     if (_errorMessage != null && _visibleResources.isEmpty) {
@@ -703,11 +707,9 @@ class _SearchField extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: TextField(
-          controller: controller,
-          onChanged: onChanged,
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
           decoration: InputDecoration(
             hintText: 'Search by title, description or course',
             prefixIcon: const Icon(Icons.search_rounded),
@@ -734,8 +736,7 @@ class _SearchField extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 }
 
@@ -852,14 +853,12 @@ class _DropdownContainer<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.8),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withOpacity(0.95)),
-          ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.88),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.95)),
+        ),
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<T?>(
@@ -872,8 +871,7 @@ class _DropdownContainer<T> extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 }
 
@@ -1176,6 +1174,74 @@ class _UploaderIdentityRow extends StatelessWidget {
   }
 }
 
+class _ResourceSkeletonCard extends StatelessWidget {
+  const _ResourceSkeletonCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.84),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.95)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4F9EFF).withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SkeletonBox(width: 42, height: 42, radius: 12),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SkeletonBox(width: double.infinity, height: 14, radius: 8),
+                const SizedBox(height: 8),
+                _SkeletonBox(width: 200, height: 12, radius: 8),
+                const SizedBox(height: 8),
+                _SkeletonBox(width: 80, height: 20, radius: 999),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SkeletonBox extends StatelessWidget {
+  const _SkeletonBox({
+    required this.width,
+    required this.height,
+    required this.radius,
+  });
+
+  final double width;
+  final double height;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        gradient: const LinearGradient(
+          colors: [Color(0xFFE2E8F0), Color(0xFFF1F5F9), Color(0xFFE2E8F0)],
+        ),
+      ),
+    );
+  }
+}
+
 class _EmptyResourceState extends StatelessWidget {
   const _EmptyResourceState({required this.onUpload});
 
@@ -1186,17 +1252,20 @@ class _EmptyResourceState extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 22),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.82),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.white.withOpacity(0.95)),
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.88),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withOpacity(0.95)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF4F9EFF).withOpacity(0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
+            ],
+          ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1228,10 +1297,8 @@ class _EmptyResourceState extends StatelessWidget {
                 ],
               ),
             ),
-          ),
         ),
-      ),
-    );
+      );
   }
 }
 
@@ -1490,14 +1557,19 @@ class _ResourceUploadSheetState extends State<_ResourceUploadSheet> {
       padding: EdgeInsets.fromLTRB(12, 12, 12, keyboardInset + 14),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(22),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.95),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: Colors.white.withOpacity(0.97)),
-            ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.98),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: Colors.white.withOpacity(0.97)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF4F9EFF).withOpacity(0.10),
+                blurRadius: 24,
+                offset: const Offset(0, -6),
+              ),
+            ],
+          ),
             child: SafeArea(
               top: false,
               child: SingleChildScrollView(
@@ -1717,7 +1789,6 @@ class _ResourceUploadSheetState extends State<_ResourceUploadSheet> {
               ),
             ),
           ),
-        ),
       ),
     );
   }
@@ -2386,36 +2457,40 @@ class _SectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.86),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.95)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: const TextStyle(
-                        color: Color(0xFF334155),
-                        fontWeight: FontWeight.w800,
-                      ),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.88),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withOpacity(0.95)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF4F9EFF).withOpacity(0.07),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      color: Color(0xFF334155),
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                  if (trailing != null) trailing!,
-                ],
-              ),
-              const SizedBox(height: 10),
-              child,
-            ],
-          ),
+                ),
+                if (trailing != null) trailing!,
+              ],
+            ),
+            const SizedBox(height: 10),
+            child,
+          ],
         ),
       ),
     );

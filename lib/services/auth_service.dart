@@ -141,9 +141,8 @@ class AuthService {
           email: normalizedEmail,
           password: normalizedPassword,
         );
-
         await _localSessionStore.setLocalAdminSignedIn(false);
-
+        await _localSessionStore.setSupabaseSessionActive(true);
         await _profileService.ensureProfileForCurrentUser(
           email: normalizedEmail,
           fullName: 'UniShareSync Administrator',
@@ -172,27 +171,39 @@ class AuthService {
           email: normalizedEmail,
           password: normalizedPassword,
         );
-
         await _localSessionStore.setLocalAdminSignedIn(false);
-
+        await _localSessionStore.setSupabaseSessionActive(true);
         await _profileService.ensureProfileForCurrentUser(
           email: normalizedEmail,
           fullName: 'Demo Faculty',
           role: UserRole.faculty,
           designation: 'Lecturer',
         );
-
         final facultyProfile = await _profileService.getCurrentProfile();
-
         return AuthSessionInfo(
           role: UserRole.faculty,
           isLocalAdmin: false,
           profile: facultyProfile,
           user: authResponse.user,
         );
-      } catch (error) {
-        throw StateError(
-          'Demo faculty sign-in failed. Ensure this account exists in Supabase Auth with confirmed email. ($error)',
+      } catch (_) {
+        // Offline fallback: allow demo faculty without a Supabase account.
+        await _localSessionStore.setDemoSession(
+          ProfileModel(
+            id: 'demo-faculty-local',
+            email: normalizedEmail,
+            fullName: 'Demo Faculty',
+            role: UserRole.faculty,
+            designation: 'Lecturer',
+            avatarUrl: null,
+            department: null,
+            studentId: null,
+            semester: null,
+          ),
+        );
+        return const AuthSessionInfo(
+          role: UserRole.faculty,
+          isLocalAdmin: false,
         );
       }
     }
@@ -203,9 +214,8 @@ class AuthService {
           email: normalizedEmail,
           password: normalizedPassword,
         );
-
         await _localSessionStore.setLocalAdminSignedIn(false);
-
+        await _localSessionStore.setSupabaseSessionActive(true);
         await _profileService.ensureProfileForCurrentUser(
           email: normalizedEmail,
           fullName: 'Demo Student',
@@ -214,18 +224,31 @@ class AuthService {
           semester: '9',
           department: 'Computer Science & Engineering',
         );
-
         final studentProfile = await _profileService.getCurrentProfile();
-
         return AuthSessionInfo(
           role: UserRole.student,
           isLocalAdmin: false,
           profile: studentProfile,
           user: authResponse.user,
         );
-      } catch (error) {
-        throw StateError(
-          'Demo student sign-in failed. Ensure this account exists in Supabase Auth with confirmed email. ($error)',
+      } catch (_) {
+        // Offline fallback: allow demo student without a Supabase account.
+        await _localSessionStore.setDemoSession(
+          ProfileModel(
+            id: 'demo-student-local',
+            email: normalizedEmail,
+            fullName: 'Demo Student',
+            role: UserRole.student,
+            studentId: '223071000',
+            semester: '9',
+            department: 'Computer Science & Engineering',
+            designation: null,
+            avatarUrl: null,
+          ),
+        );
+        return const AuthSessionInfo(
+          role: UserRole.student,
+          isLocalAdmin: false,
         );
       }
     }
@@ -273,6 +296,8 @@ class AuthService {
       throw StateError('Your account has been deactivated. Please contact an administrator.');
     }
 
+    await _localSessionStore.setSupabaseSessionActive(true);
+
     final resolvedRole = profile?.role ??
         UserRole.fromString(
             authResponse.user?.userMetadata?['role']?.toString());
@@ -316,9 +341,14 @@ class AuthService {
   }
 
   Future<bool> hasActiveSession() async {
-    return _client.auth.currentSession != null ||
-        await _localSessionStore.isLocalAdminSignedIn() ||
-        await _localSessionStore.isDriverSignedIn();
+    // Live Supabase session (online)
+    if (_client.auth.currentSession != null) return true;
+    // Local-only sessions
+    if (await _localSessionStore.isLocalAdminSignedIn()) return true;
+    if (await _localSessionStore.isDriverSignedIn()) return true;
+    if (await _localSessionStore.hasDemoSession()) return true;
+    // Offline fallback: user had a valid Supabase session last time they were online
+    return _localSessionStore.wasSupabaseSessionActive();
   }
 
   Future<UserRole?> getCurrentRole() async {
@@ -330,6 +360,27 @@ class AuthService {
     final isDriver = await _localSessionStore.isDriverSignedIn();
     if (isDriver && _client.auth.currentSession == null) {
       return UserRole.driver;
+    }
+
+    if (_client.auth.currentSession == null) {
+      final demoProfile = await _localSessionStore.getDemoSessionProfile();
+      if (demoProfile != null) return demoProfile.role;
+
+      // Offline: Supabase session exists on-device but couldn't refresh.
+      // Try to resolve role from the cached profile.
+      if (await _localSessionStore.wasSupabaseSessionActive()) {
+        final user = _client.auth.currentUser; // may still be populated
+        if (user != null) {
+          final cached = await _localSessionStore.getCachedProfile(user.id);
+          if (cached != null) return cached.role;
+          // Fall back to email-based role resolution
+          final email = user.email?.toLowerCase();
+          if (email == AppSecrets.fixedAdminEmail.toLowerCase()) return UserRole.admin;
+          if (email == AppSecrets.fixedFacultyEmail.toLowerCase()) return UserRole.faculty;
+          if (email == AppSecrets.fixedStudentEmail.toLowerCase()) return UserRole.student;
+          return UserRole.fromString(user.userMetadata?['role']?.toString());
+        }
+      }
     }
 
     final user = _client.auth.currentUser;
@@ -370,6 +421,8 @@ class AuthService {
   Future<void> signOut() async {
     await _localSessionStore.setLocalAdminSignedIn(false);
     await _localSessionStore.clearDriverSession();
+    await _localSessionStore.clearDemoSession();
+    await _localSessionStore.setSupabaseSessionActive(false);
 
     if (_client.auth.currentSession != null) {
       await _client.auth.signOut();

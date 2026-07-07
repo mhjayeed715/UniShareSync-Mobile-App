@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -8,8 +6,15 @@ import 'notice_service.dart';
 
 // ── Public entry point ────────────────────────────────────────────────────────
 
-class NoticeBoardScreen extends StatelessWidget {
+class NoticeBoardScreen extends StatefulWidget {
   const NoticeBoardScreen({super.key});
+
+  @override
+  State<NoticeBoardScreen> createState() => _NoticeBoardScreenState();
+}
+
+class _NoticeBoardScreenState extends State<NoticeBoardScreen> {
+  int _retryTick = 0;
 
   static const _amber = Color(0xFFF59E0B);
   static const _bg = Color(0xFFF4F8FF);
@@ -55,20 +60,24 @@ class NoticeBoardScreen extends StatelessWidget {
           ),
           SafeArea(
             child: StreamBuilder<List<NoticeModel>>(
+              key: ValueKey(_retryTick),
               stream: NoticeService().watchNotices(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting &&
                     !snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const _NoticeBoardLoadingState();
                 }
                 if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
+                  return _NoticeBoardErrorState(
+                    message: 'Unable to load notices.',
+                    onRetry: () => setState(() => _retryTick++),
+                  );
                 }
                 final notices = snapshot.data ?? [];
                 if (notices.isEmpty) {
-                  return const Center(
-                    child: Text('No notices available.',
-                        style: TextStyle(color: Color(0xFF64748B))),
+                  return const _NoticeBoardEmptyState(
+                    title: 'No notices available',
+                    subtitle: 'New notices will appear here when published.',
                   );
                 }
                 return ListView.separated(
@@ -99,26 +108,39 @@ class NoticeBoardScreen extends StatelessWidget {
 
 // ── Dashboard horizontal preview strip ───────────────────────────────────────
 
-class NoticeDashboardStrip extends StatelessWidget {
+class NoticeDashboardStrip extends StatefulWidget {
   const NoticeDashboardStrip({super.key});
+
+  @override
+  State<NoticeDashboardStrip> createState() => _NoticeDashboardStripState();
+}
+
+class _NoticeDashboardStripState extends State<NoticeDashboardStrip> {
+  int _retryTick = 0;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: 152,
       child: StreamBuilder<List<NoticeModel>>(
+        key: ValueKey(_retryTick),
         stream: NoticeService().watchNotices(limit: 10),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting &&
               !snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
+            return const _NoticeStripLoadingState();
+          }
+          if (snapshot.hasError) {
+            return _NoticeStripErrorState(
+              onRetry: () => setState(() => _retryTick++),
+            );
           }
           final notices = snapshot.data ?? [];
           if (notices.isEmpty) {
             return const _GlassCard(
-              child: Center(
-                child: Text('No notices yet.',
-                    style: TextStyle(color: Color(0xFF64748B))),
+              child: _NoticeBoardEmptyState(
+                title: 'No notices yet',
+                subtitle: 'This preview updates when notices are published.',
               ),
             );
           }
@@ -140,6 +162,142 @@ class NoticeDashboardStrip extends StatelessWidget {
             },
           );
         },
+      ),
+    );
+  }
+}
+
+class _NoticeBoardLoadingState extends StatelessWidget {
+  const _NoticeBoardLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+      itemCount: 4,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (_, __) => const _NoticeSkeletonCard(),
+    );
+  }
+}
+
+class _NoticeStripLoadingState extends StatelessWidget {
+  const _NoticeStripLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: 3,
+      separatorBuilder: (_, __) => const SizedBox(width: 10),
+      itemBuilder: (_, __) => const SizedBox(
+        width: 220,
+        child: _NoticeSkeletonCard(compact: true),
+      ),
+    );
+  }
+}
+
+class _NoticeBoardErrorState extends StatelessWidget {
+  const _NoticeBoardErrorState({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: _GlassCard(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_rounded, size: 34, color: Color(0xFF64748B)),
+            const SizedBox(height: 8),
+            Text(message, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            TextButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NoticeStripErrorState extends StatelessWidget {
+  const _NoticeStripErrorState({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return _GlassCard(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Expanded(
+            child: Text(
+              'Unable to load notices',
+              style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+            ),
+          ),
+          TextButton(onPressed: onRetry, child: const Text('Retry')),
+        ],
+      ),
+    );
+  }
+}
+
+class _NoticeBoardEmptyState extends StatelessWidget {
+  const _NoticeBoardEmptyState({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.notifications_none_rounded, size: 64, color: Colors.grey.shade400),
+          const SizedBox(height: 16),
+          Text(title, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Text(subtitle, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF64748B))),
+        ],
+      ),
+    );
+  }
+}
+
+class _NoticeSkeletonCard extends StatelessWidget {
+  const _NoticeSkeletonCard({this.compact = false});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final height = compact ? 124.0 : 118.0;
+    return _GlassCard(
+      child: SizedBox(
+        height: height,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(width: 72, height: 18, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(999))),
+            const SizedBox(height: 10),
+            Container(width: double.infinity, height: 14, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(8))),
+            const SizedBox(height: 8),
+            Container(width: 180, height: 12, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(8))),
+            const Spacer(),
+            Container(width: 90, height: 12, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(8))),
+          ],
+        ),
       ),
     );
   }
@@ -572,27 +730,21 @@ class _GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.82),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.95)),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFF59E0B).withOpacity(0.08),
-                blurRadius: 14,
-                offset: const Offset(0, 6),
-              ),
-            ],
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.88),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.95)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFF59E0B).withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
           ),
-          child: child,
-        ),
+        ],
       ),
+      child: child,
     );
   }
 }

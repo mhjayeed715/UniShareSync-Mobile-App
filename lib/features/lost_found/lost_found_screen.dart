@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -31,6 +30,7 @@ class _LostFoundScreenState extends State<LostFoundScreen> {
   bool _isLocalAdmin = false;
   bool _isLoading = true;
   bool _isSubmitting = false;
+  int _refreshTick = 0;
 
   LostFoundReportType? _selectedTypeFilter;
   String _selectedCategoryFilter = 'All Categories';
@@ -771,6 +771,7 @@ class _LostFoundScreenState extends State<LostFoundScreen> {
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
                     child: StreamBuilder<List<LostFoundReport>>(
+                      key: ValueKey(_refreshTick),
                       stream: _service.watchReports(limit: 300),
                       builder: (context, snapshot) {
                         if (_isLocalAdmin && _currentUserId == null) {
@@ -785,21 +786,20 @@ class _LostFoundScreenState extends State<LostFoundScreen> {
 
                         if (snapshot.connectionState == ConnectionState.waiting &&
                             !snapshot.hasData) {
-                          return const Center(child: CircularProgressIndicator());
+                          return const _LostFoundSkeletonList();
                         }
 
                         if (snapshot.hasError) {
-                          return Center(
-                            child: _GlassPanel(
-                              child: Text(
-                                'Unable to load lost and found reports.\n${snapshot.error}',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: Color(0xFF334155),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
+                          return _LostFoundErrorState(
+                            onRetry: () {
+                              if (!mounted) {
+                                return;
+                              }
+
+                              setState(() {
+                                _refreshTick++;
+                              });
+                            },
                           );
                         }
 
@@ -1007,6 +1007,63 @@ class _LostFoundScreenState extends State<LostFoundScreen> {
   }
 }
 
+class _LostFoundSkeletonList extends StatelessWidget {
+  const _LostFoundSkeletonList();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 32),
+      itemCount: 4,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (_, __) => _GlassPanel(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(width: 84, height: 14, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(999))),
+            const SizedBox(height: 10),
+            Container(width: double.infinity, height: 12, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(8))),
+            const SizedBox(height: 8),
+            Container(width: 180, height: 12, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(8))),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LostFoundErrorState extends StatelessWidget {
+  const _LostFoundErrorState({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: _GlassPanel(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_rounded, size: 34, color: Color(0xFF64748B)),
+            const SizedBox(height: 8),
+            const Text(
+              'Unable to load lost and found reports',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+            ),
+            const SizedBox(height: 4),
+            TextButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ReportDetailSheet extends StatelessWidget {
   const _ReportDetailSheet({
     required this.report,
@@ -1058,20 +1115,23 @@ class _ReportDetailSheet extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 22),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.92),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.white.withOpacity(0.95)),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.97),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withOpacity(0.95)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF4F9EFF).withOpacity(0.10),
+              blurRadius: 20,
+              offset: const Offset(0, -4),
             ),
-            child: SafeArea(
-              top: false,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1226,12 +1286,10 @@ class _ReportDetailSheet extends StatelessWidget {
                     ],
                   ],
                 ),
-              ),
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 }
 
@@ -1772,20 +1830,21 @@ class _GlassPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.86),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.95)),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.88),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.95)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4F9EFF).withOpacity(0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
           ),
-          child: child,
-        ),
+        ],
       ),
+      child: child,
     );
   }
 }

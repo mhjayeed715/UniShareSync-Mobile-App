@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:unisharesync_mobile_app/data/models/dashboard_feed_item.dart';
 import 'package:unisharesync_mobile_app/data/models/profile_model.dart';
@@ -62,10 +63,12 @@ class RoleHomeScreen extends StatefulWidget {
   const RoleHomeScreen({
     super.key,
     this.initialRole,
+    this.initialProfile,
     this.isLocalAdmin,
   });
 
   final UserRole? initialRole;
+  final ProfileModel? initialProfile;
   final bool? isLocalAdmin;
 
   @override
@@ -133,6 +136,39 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
   }
 
   Future<void> _resolveSession() async {
+    // If splash pre-loaded everything, skip the network round-trip.
+    if (widget.initialProfile != null && widget.initialRole != null) {
+      final role = widget.initialRole!;
+      final profile = widget.initialProfile;
+      final isLocalAdmin = widget.isLocalAdmin ?? false;
+
+      if ((role == UserRole.admin || isLocalAdmin) && mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => AdminHomeScreen(
+              isLocalAdmin: isLocalAdmin,
+              initialProfile: profile,
+            ),
+          ),
+        );
+        return;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _role = role;
+        _isLocalAdmin = isLocalAdmin;
+        _profile = profile;
+        _isLoading = false;
+      });
+
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId != null && !_isLocalAdmin) {
+        _initNotificationStreams(userId);
+      }
+      return;
+    }
+
     try {
       final role = widget.initialRole ?? await _authService.getCurrentRole();
       final isLocalAdmin =
@@ -177,13 +213,44 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
         _initNotificationStreams(userId);
       }
     } catch (_) {
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _handleSystemBack() async {
+    if (_activeTab != _DashboardTab.home) {
+      setState(() {
+        _activeTab = _DashboardTab.home;
+      });
+      return;
+    }
+
+    final shouldExit = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Exit app?'),
+            content: const Text(
+              'You are on the dashboard. Do you want to close the app?'
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Stay'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Exit'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (shouldExit) {
+      SystemNavigator.pop();
     }
   }
 
@@ -353,15 +420,20 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 22),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(24),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.88),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.white.withOpacity(0.95)),
-                ),
-                child: SafeArea(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.97),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white.withOpacity(0.95)),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF4F9EFF).withOpacity(0.12),
+                    blurRadius: 20,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: SafeArea(
                   top: false,
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
@@ -448,7 +520,6 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
                 ),
               ),
             ),
-          ),
         );
       },
     );
@@ -1023,23 +1094,27 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
 
   Widget _buildResourcePreviewList() {
     return FutureBuilder<List<DashboardFeedItem>>(
-      future: Future.delayed(
-        const Duration(seconds: 3),
-        () => _dashboardFeedService.watchResources(limit: 30).first,
-      ).catchError((_) => const <DashboardFeedItem>[]),
+      future: _dashboardFeedService.watchResources(limit: 30).first,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Center(child: CircularProgressIndicator()),
-          );
+          return const _ResourcePreviewSkeletonList(itemCount: 4);
         }
 
         if (snapshot.hasError) {
           return _GlassCard(
-            child: _CompactMessage(
+            child: _CompactMessageWithAction(
               title: 'Unable to load resources',
-              subtitle: '${snapshot.error}',
+              subtitle: 'Check your connection and try again.',
+              actionLabel: 'Retry',
+              onAction: () {
+                if (!mounted) {
+                  return;
+                }
+
+                setState(() {
+                  _resourcesRefreshTick++;
+                });
+              },
             ),
           );
         }
@@ -1080,77 +1155,80 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
-      backgroundColor: _DashboardPalette.scaffold,
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Stack(
-              children: [
-                const Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          _DashboardPalette.authGradientStart,
-                          _DashboardPalette.authGradientEnd,
-                        ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleSystemBack();
+      },
+      child: Scaffold(
+        extendBody: true,
+        backgroundColor: _DashboardPalette.scaffold,
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Stack(
+                children: [
+                  const Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            _DashboardPalette.authGradientStart,
+                            _DashboardPalette.authGradientEnd,
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                Positioned(
-                  top: -120,
-                  right: -80,
-                  child: Container(
-                    width: 260,
-                    height: 260,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _DashboardPalette.authBlue.withOpacity(0.12),
+                  Positioned(
+                    top: -120,
+                    right: -80,
+                    child: Container(
+                      width: 260,
+                      height: 260,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _DashboardPalette.authBlue.withOpacity(0.12),
+                      ),
                     ),
                   ),
-                ),
-                Positioned(
-                  bottom: -140,
-                  left: -80,
-                  child: Container(
-                    width: 260,
-                    height: 260,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _DashboardPalette.authTeal.withOpacity(0.1),
+                  Positioned(
+                    bottom: -140,
+                    left: -80,
+                    child: Container(
+                      width: 260,
+                      height: 260,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _DashboardPalette.authTeal.withOpacity(0.1),
+                      ),
                     ),
                   ),
-                ),
-                SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 220),
+                  SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
                       child: _buildCurrentTab(),
                     ),
                   ),
-                ),
-              ],
-            ),
-      bottomNavigationBar: _isLoading
-          ? null
-          : Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-              child: _FloatingGlassBottomNav(
-                activeTab: _activeTab,
-                onTabSelected: (_DashboardTab tab) {
-                  setState(() {
-                    _activeTab = tab;
-                  });
-                },
-                onCenterPressed: _openQuickActionSheet,
-                onMenuPressed: _openHamburgerMenu,
+                ],
               ),
-            ),
+        bottomNavigationBar: _isLoading
+            ? null
+            : Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+                child: _FloatingGlassBottomNav(
+                  activeTab: _activeTab,
+                  onTabSelected: (_DashboardTab tab) {
+                    setState(() {
+                      _activeTab = tab;
+                    });
+                  },
+                  onCenterPressed: _openQuickActionSheet,
+                  onMenuPressed: _openHamburgerMenu,
+                ),
+              ),
+      ),
     );
   }
 }
@@ -1322,27 +1400,23 @@ class _GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.78),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withOpacity(0.95)),
-            boxShadow: [
-              BoxShadow(
-                color: _DashboardPalette.authBlue.withOpacity(0.12),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
-              ),
-            ],
+    // Lightweight card — no BackdropFilter to keep 60fps on mid-range devices.
+    // The subtle white fill + border preserves the glassmorphism aesthetic.
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.88),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withOpacity(0.95)),
+        boxShadow: [
+          BoxShadow(
+            color: _DashboardPalette.authBlue.withOpacity(0.10),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
           ),
-          child: child,
-        ),
+        ],
       ),
+      child: child,
     );
   }
 }
@@ -1621,6 +1695,133 @@ class _CompactMessage extends StatelessWidget {
   }
 }
 
+class _CompactMessageWithAction extends StatelessWidget {
+  const _CompactMessageWithAction({
+    required this.title,
+    required this.subtitle,
+    required this.actionLabel,
+    required this.onAction,
+  });
+
+  final String title;
+  final String subtitle;
+  final String actionLabel;
+  final VoidCallback onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Color(0xFF0F172A),
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(color: Colors.grey.shade700),
+        ),
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: onAction,
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: Text(actionLabel),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ResourcePreviewSkeletonList extends StatelessWidget {
+  const _ResourcePreviewSkeletonList({required this.itemCount});
+
+  final int itemCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: List.generate(
+        itemCount,
+        (index) => Padding(
+          padding: EdgeInsets.only(bottom: index == itemCount - 1 ? 0 : 10),
+          child: const _ResourcePreviewSkeletonCard(),
+        ),
+      ),
+    );
+  }
+}
+
+class _ResourcePreviewSkeletonCard extends StatelessWidget {
+  const _ResourcePreviewSkeletonCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return _GlassCard(
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SkeletonBox(width: 36, height: 36, radius: 10),
+          SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SkeletonBox(width: double.infinity, height: 14, radius: 8),
+                SizedBox(height: 8),
+                _SkeletonBox(width: 180, height: 12, radius: 8),
+                SizedBox(height: 8),
+                _SkeletonBox(width: 74, height: 18, radius: 999),
+              ],
+            ),
+          ),
+          SizedBox(width: 8),
+          _SkeletonBox(width: 38, height: 12, radius: 8),
+        ],
+      ),
+    );
+  }
+}
+
+class _SkeletonBox extends StatelessWidget {
+  const _SkeletonBox({
+    required this.width,
+    required this.height,
+    required this.radius,
+  });
+
+  final double width;
+  final double height;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFFE2E8F0),
+            Color(0xFFF1F5F9),
+            Color(0xFFE2E8F0),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.title, required this.subtitle});
 
@@ -1739,7 +1940,6 @@ class _HamburgerMenuScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
               children: [
-                // ── Profile card ────────────────────────────────────────
                 _GlassCard(
                   padding: const EdgeInsets.all(16),
                   child: Row(
@@ -1959,31 +2159,32 @@ class _GlassSettingsGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.78),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withOpacity(0.95)),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.88),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withOpacity(0.95)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4F9EFF).withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
-          child: Column(
-            children: [
-              for (int i = 0; i < children.length; i++) ...[
-                children[i],
-                if (i < children.length - 1)
-                  Divider(
-                    height: 1,
-                    indent: 54,
-                    endIndent: 0,
-                    color: const Color(0xFFE2E8F0).withOpacity(0.8),
-                  ),
-              ],
-            ],
-          ),
-        ),
+        ],
+      ),
+      child: Column(
+        children: [
+          for (int i = 0; i < children.length; i++) ...[
+            children[i],
+            if (i < children.length - 1)
+              Divider(
+                height: 1,
+                indent: 54,
+                endIndent: 0,
+                color: const Color(0xFFE2E8F0).withOpacity(0.8),
+              ),
+          ],
+        ],
       ),
     );
   }
@@ -2065,60 +2266,60 @@ class _SignOutButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.78),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withOpacity(0.95)),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.88),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withOpacity(0.95)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFDC2626).withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(18),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 15),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDC2626).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(9),
-                      ),
-                      child: isLoading
-                          ? const Padding(
-                              padding: EdgeInsets.all(8),
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation(
-                                    Color(0xFFDC2626)),
-                              ),
-                            )
-                          : const Icon(
-                              Icons.logout_rounded,
-                              color: Color(0xFFDC2626),
-                              size: 18,
-                            ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      isLoading ? 'Signing out...' : 'Sign Out',
-                      style: const TextStyle(
-                        color: Color(0xFFDC2626),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ],
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+            child: Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDC2626).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: isLoading
+                      ? const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation(Color(0xFFDC2626)),
+                          ),
+                        )
+                      : const Icon(
+                          Icons.logout_rounded,
+                          color: Color(0xFFDC2626),
+                          size: 18,
+                        ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Text(
+                  isLoading ? 'Signing out...' : 'Sign Out',
+                  style: const TextStyle(
+                    color: Color(0xFFDC2626),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
+              ],
             ),
           ),
         ),

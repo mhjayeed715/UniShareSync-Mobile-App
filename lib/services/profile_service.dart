@@ -3,12 +3,14 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:unisharesync_mobile_app/data/models/profile_model.dart';
 import 'package:unisharesync_mobile_app/data/models/user_role.dart';
+import 'package:unisharesync_mobile_app/services/local_session_store.dart';
 
 class ProfileService {
   ProfileService({SupabaseClient? client})
       : _client = client ?? Supabase.instance.client;
 
   final SupabaseClient _client;
+  final LocalSessionStore _localSessionStore = LocalSessionStore();
 
   Future<ProfileModel?> getCurrentProfile() async {
     final user = _client.auth.currentUser;
@@ -16,17 +18,23 @@ class ProfileService {
       return null;
     }
 
-    final response = await _client
-        .from('profiles')
-        .select()
-        .eq('id', user.id)
-        .maybeSingle();
+    try {
+      final response = await _client
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
 
-    if (response == null) {
-      return null;
+      if (response == null) {
+        return _localSessionStore.getCachedProfile(user.id);
+      }
+
+      final profile = ProfileModel.fromMap(response);
+      await _localSessionStore.cacheProfile(profile);
+      return profile;
+    } catch (_) {
+      return _localSessionStore.getCachedProfile(user.id);
     }
-
-    return ProfileModel.fromMap(response);
   }
 
   Future<void> ensureProfileForCurrentUser({
@@ -57,6 +65,7 @@ class ProfileService {
     );
 
     await _client.from('profiles').upsert(profile.toUpsertMap());
+    await _localSessionStore.cacheProfile(profile);
   }
 
   Future<void> updateCurrentProfile(ProfileModel profile) async {
@@ -65,7 +74,9 @@ class ProfileService {
       throw StateError('No active user session found.');
     }
 
-    await _client.from('profiles').upsert(profile.copyWith(id: user.id).toUpsertMap());
+    final updated = profile.copyWith(id: user.id);
+    await _client.from('profiles').upsert(updated.toUpsertMap());
+    await _localSessionStore.cacheProfile(updated);
   }
 
   Future<String> uploadProfilePhoto({
@@ -96,6 +107,11 @@ class ProfileService {
       'avatar_url': publicUrl,
       'updated_at': DateTime.now().toIso8601String(),
     }).eq('id', user.id);
+
+    final cachedProfile = await getCurrentProfile();
+    if (cachedProfile != null) {
+      await _localSessionStore.cacheProfile(cachedProfile.copyWith(avatarUrl: publicUrl));
+    }
 
     return publicUrl;
   }

@@ -5,6 +5,7 @@ import 'package:unisharesync_mobile_app/data/models/user_role.dart';
 import 'package:unisharesync_mobile_app/core/utils/image_compression.dart';
 import 'package:unisharesync_mobile_app/features/lost_found/lost_found_model.dart';
 import 'package:unisharesync_mobile_app/services/profile_service.dart';
+import 'package:unisharesync_mobile_app/services/offline_cache_service.dart';
 
 class LostFoundService {
   LostFoundService({SupabaseClient? client, ProfileService? profileService})
@@ -13,32 +14,57 @@ class LostFoundService {
 
   final SupabaseClient _client;
   final ProfileService _profileService;
+  final OfflineCacheService _cache = OfflineCacheService.instance;
 
   String? get currentUserId => _client.auth.currentUser?.id;
 
-  Stream<List<LostFoundReport>> watchReports({int limit = 200}) {
-    return _client
+  String _cacheKey(String suffix) => 'lost_found_$suffix';
+
+  Stream<List<LostFoundReport>> watchReports({int limit = 200}) async* {
+    final userId = currentUserId ?? 'guest';
+    final cacheKey = _cacheKey('reports_${userId}_$limit');
+    final cached = await _cache.readJsonList(cacheKey);
+    if (cached.isNotEmpty) {
+      yield cached.map(LostFoundReport.fromMap).toList(growable: false);
+    }
+
+    try {
+      await for (final rows in _client
         .from('lost_found_reports')
         .stream(primaryKey: const ['id'])
         .order('created_at', ascending: false)
         .limit(limit)
-        .map(
-          (rows) => rows
-              .map((row) => LostFoundReport.fromMap(Map<String, dynamic>.from(row)))
-              .toList(growable: false),
-        );
+      ) {
+        await _cache.saveJsonList(cacheKey, rows);
+        yield rows
+            .map((row) => LostFoundReport.fromMap(Map<String, dynamic>.from(row)))
+            .toList(growable: false);
+      }
+    } catch (_) {
+      if (cached.isEmpty) {
+        yield const <LostFoundReport>[];
+      }
+    }
   }
 
   Future<List<LostFoundReport>> fetchReports({int limit = 200}) async {
-    final response = await _client
-        .from('lost_found_reports')
-        .select()
-        .order('created_at', ascending: false)
-        .limit(limit);
+    final cacheKey = _cacheKey('reports_${currentUserId ?? 'guest'}_$limit');
+    try {
+      final response = await _client
+          .from('lost_found_reports')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(limit);
 
-    return (response as List<dynamic>)
-        .map((row) => LostFoundReport.fromMap(Map<String, dynamic>.from(row)))
-        .toList(growable: false);
+      final rows = (response as List<dynamic>)
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList(growable: false);
+      await _cache.saveJsonList(cacheKey, rows);
+      return rows.map(LostFoundReport.fromMap).toList(growable: false);
+    } catch (_) {
+      final cached = await _cache.readJsonList(cacheKey);
+      return cached.map(LostFoundReport.fromMap).toList(growable: false);
+    }
   }
 
   Future<LostFoundReport> createReport({

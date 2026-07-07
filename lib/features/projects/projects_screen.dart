@@ -307,7 +307,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     if (_isProfileLoading) {
       return const Scaffold(
         backgroundColor: Color(0xFFF4F8FF),
-        body: Center(child: CircularProgressIndicator()),
+        body: _ProjectSkeletonList(),
       );
     }
 
@@ -505,7 +505,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
   Widget _buildBrowseProjectsTab() {
     if (_isLoading && _browseProjects.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const _ProjectSkeletonList();
     }
 
     if (_errorMessage != null && _browseProjects.isEmpty) {
@@ -547,7 +547,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
   Widget _buildManagedProjectsTab() {
     if (_isLoading && _managedProjects.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const _ProjectSkeletonList();
     }
 
     if (_errorMessage != null && _managedProjects.isEmpty) {
@@ -636,6 +636,58 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     );
   }
 
+}
+
+class _ProjectSkeletonList extends StatelessWidget {
+  const _ProjectSkeletonList();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+      itemCount: 4,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (_, __) => ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.78),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withOpacity(0.95)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(width: 160, height: 16, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(8))),
+                  const Spacer(),
+                  Container(width: 60, height: 22, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(999))),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Container(width: 100, height: 12, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(8))),
+              const SizedBox(height: 10),
+              Container(width: double.infinity, height: 12, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(8))),
+              const SizedBox(height: 6),
+              Container(width: 220, height: 12, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(8))),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Container(width: 60, height: 20, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(999))),
+                  const SizedBox(width: 6),
+                  Container(width: 60, height: 20, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(999))),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Container(width: double.infinity, height: 4, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(3))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _ProjectTab {

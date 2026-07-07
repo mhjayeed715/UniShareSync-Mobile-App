@@ -40,13 +40,12 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   FeedbackStatus? _selectedStatusFilter;
   String _selectedCategoryFilter = 'All Categories';
 
-  late final Stream<List<FeedbackEntry>> _feedbackStream;
+  late Stream<List<FeedbackEntry>> _feedbackStream;
 
   @override
   void initState() {
     super.initState();
-    _feedbackStream = _service.watchFeedback(limit: 200).asBroadcastStream();
-    _bootstrap();
+    _loadData();
   }
 
   @override
@@ -58,7 +57,8 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     super.dispose();
   }
 
-  Future<void> _bootstrap() async {
+  Future<void> _loadData() async {
+    _feedbackStream = _service.watchFeedback(limit: 200).asBroadcastStream();
     try {
       final role = widget.initialRole ?? await _authService.getCurrentRole();
       final isLocalAdmin =
@@ -375,7 +375,10 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        backgroundColor: Color(0xFFF4F8FF),
+        body: _FeedbackSkeleton(),
+      );
     }
 
     return Scaffold(
@@ -437,6 +440,17 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     return StreamBuilder<List<FeedbackEntry>>(
       stream: _feedbackStream,
       builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return const _FeedbackLoadingState();
+        }
+
+        if (snapshot.hasError) {
+          return _FeedbackErrorState(
+            onRetry: _reloadFeedback,
+          );
+        }
+
         final feedback = snapshot.data ?? const <FeedbackEntry>[];
         final myFeedback = feedback
             .where((entry) => entry.submitterId == _currentUserId)
@@ -564,6 +578,18 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
         );
       },
     );
+  }
+
+  Future<void> _reloadFeedback() async {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    await _loadData();
   }
 
   Widget _buildSubmitTab() {
@@ -972,6 +998,87 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
           ],
         );
       },
+    );
+  }
+}
+
+class _FeedbackLoadingState extends StatelessWidget {
+  const _FeedbackLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _FeedbackSkeleton();
+  }
+}
+
+class _FeedbackSkeleton extends StatelessWidget {
+  const _FeedbackSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      itemCount: 4,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (_, __) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.88),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withOpacity(0.96)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(width: 60, height: 20, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(999))),
+                const SizedBox(width: 8),
+                Container(width: 60, height: 20, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(999))),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Container(width: 200, height: 16, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(8))),
+            const SizedBox(height: 8),
+            Container(width: double.infinity, height: 12, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(8))),
+            const SizedBox(height: 6),
+            Container(width: 220, height: 12, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(8))),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FeedbackErrorState extends StatelessWidget {
+  const _FeedbackErrorState({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_rounded, size: 34, color: Color(0xFF64748B)),
+            const SizedBox(height: 8),
+            const Text(
+              'Unable to load feedback',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+            ),
+            const SizedBox(height: 4),
+            TextButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

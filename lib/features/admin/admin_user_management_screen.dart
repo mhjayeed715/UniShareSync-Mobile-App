@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:unisharesync_mobile_app/data/models/profile_model.dart';
 import 'package:unisharesync_mobile_app/data/models/user_role.dart';
 import 'package:unisharesync_mobile_app/services/admin_user_management_service.dart';
+import 'package:unisharesync_mobile_app/core/config/constants.dart';
 
 class AdminUserManagementScreen extends StatefulWidget {
   const AdminUserManagementScreen({super.key});
@@ -656,11 +657,13 @@ class _UserFormDialogState extends State<_UserFormDialog> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _emailCtrl;
   late final TextEditingController _passwordCtrl;
-  late final TextEditingController _deptCtrl;
   late final TextEditingController _studentIdCtrl;
   late final TextEditingController _semCtrl;
   late final TextEditingController _designationCtrl;
   late UserRole _role;
+
+  late final List<String> _dialogDepartments;
+  String? _selectedDepartment;
 
   bool _saving = false;
   bool get _isEdit => widget.existing != null;
@@ -672,18 +675,28 @@ class _UserFormDialogState extends State<_UserFormDialog> {
     _nameCtrl = TextEditingController(text: u?.fullName ?? '');
     _emailCtrl = TextEditingController(text: u?.email ?? '');
     _passwordCtrl = TextEditingController();
-    _deptCtrl = TextEditingController(text: u?.department ?? '');
+    _selectedDepartment = u?.department;
     _studentIdCtrl = TextEditingController(text: u?.studentId ?? '');
     _semCtrl = TextEditingController(text: u?.semester ?? '');
     _designationCtrl = TextEditingController(text: u?.designation ?? '');
     _role = u?.role ?? UserRole.student;
+
+    if (_selectedDepartment != null && _selectedDepartment!.isNotEmpty) {
+      if (!AppConstants.departments.contains(_selectedDepartment)) {
+        _dialogDepartments = List.from(AppConstants.departments)..add(_selectedDepartment!);
+      } else {
+        _dialogDepartments = List.from(AppConstants.departments);
+      }
+    } else {
+      _dialogDepartments = List.from(AppConstants.departments);
+    }
   }
 
   @override
   void dispose() {
     for (final c in [
       _nameCtrl, _emailCtrl, _passwordCtrl,
-      _deptCtrl, _studentIdCtrl, _semCtrl, _designationCtrl
+      _studentIdCtrl, _semCtrl, _designationCtrl
     ]) {
       c.dispose();
     }
@@ -698,7 +711,7 @@ class _UserFormDialogState extends State<_UserFormDialog> {
         await _service.updateUser(widget.existing!.copyWith(
           fullName: _nameCtrl.text.trim(),
           role: _role,
-          department: _deptCtrl.text.trim().isEmpty ? null : _deptCtrl.text.trim(),
+          department: _selectedDepartment,
           studentId: _studentIdCtrl.text.trim().isEmpty ? null : _studentIdCtrl.text.trim(),
           semester: _semCtrl.text.trim().isEmpty ? null : _semCtrl.text.trim(),
           designation: _designationCtrl.text.trim().isEmpty ? null : _designationCtrl.text.trim(),
@@ -709,7 +722,7 @@ class _UserFormDialogState extends State<_UserFormDialog> {
           password: _passwordCtrl.text.trim(),
           fullName: _nameCtrl.text.trim(),
           role: _role,
-          department: _deptCtrl.text.trim().isEmpty ? null : _deptCtrl.text.trim(),
+          department: _selectedDepartment,
           studentId: _studentIdCtrl.text.trim().isEmpty ? null : _studentIdCtrl.text.trim(),
           semester: _semCtrl.text.trim().isEmpty ? null : _semCtrl.text.trim(),
           designation: _designationCtrl.text.trim().isEmpty ? null : _designationCtrl.text.trim(),
@@ -743,11 +756,42 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                 _field(_nameCtrl, 'Full Name', icon: Icons.person_outline_rounded, required: true),
                 if (!_isEdit) ...[
                   const SizedBox(height: 10),
-                  _field(_emailCtrl, 'Email', icon: Icons.email_outlined, required: true,
-                      keyboardType: TextInputType.emailAddress),
+                  TextFormField(
+                    controller: _emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      labelText: 'Email',
+                      prefixIcon: const Icon(Icons.email_outlined),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    validator: (v) {
+                      final email = (v ?? '').trim();
+                      if (email.isEmpty) return 'Email is required';
+                      final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+                      if (!emailRegex.hasMatch(email)) {
+                        return 'Enter a valid email address';
+                      }
+                      return null;
+                    },
+                  ),
                   const SizedBox(height: 10),
-                  _field(_passwordCtrl, 'Password', icon: Icons.lock_outline_rounded,
-                      required: true, obscure: true),
+                  TextFormField(
+                    controller: _passwordCtrl,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      prefixIcon: const Icon(Icons.lock_outline_rounded),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    validator: (v) {
+                      final password = v ?? '';
+                      if (password.isEmpty) return 'Password is required';
+                      if (password.length < 6) {
+                        return 'Password must be at least 6 characters';
+                      }
+                      return null;
+                    },
+                  ),
                 ],
                 const SizedBox(height: 10),
                 DropdownButtonFormField<UserRole>(
@@ -763,7 +807,27 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                   onChanged: (v) => setState(() => _role = v ?? _role),
                 ),
                 const SizedBox(height: 10),
-                _field(_deptCtrl, 'Department', icon: Icons.school_outlined),
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedDepartment,
+                  decoration: InputDecoration(
+                    labelText: 'Department',
+                    prefixIcon: const Icon(Icons.school_outlined),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    suffixIcon: _selectedDepartment != null
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded, size: 20),
+                            onPressed: () => setState(() => _selectedDepartment = null),
+                          )
+                        : null,
+                  ),
+                  dropdownColor: Colors.white,
+                  isExpanded: true,
+                  hint: const Text('Select Department'),
+                  items: _dialogDepartments
+                      .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _selectedDepartment = v),
+                ),
                 const SizedBox(height: 10),
                 _field(_studentIdCtrl, 'Student ID', icon: Icons.badge_outlined),
                 const SizedBox(height: 10),

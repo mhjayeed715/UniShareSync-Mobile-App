@@ -46,6 +46,18 @@
             <action android:name="com.google.firebase.MESSAGING_EVENT"/>
         </intent-filter>
     </service>
+    <!-- FCM: default notification channel for background messages -->
+    <meta-data
+        android:name="com.google.firebase.messaging.default_notification_channel_id"
+        android:value="campus_notices_channel" />
+    <!-- FCM: default notification icon -->
+    <meta-data
+        android:name="com.google.firebase.messaging.default_notification_icon"
+        android:resource="@drawable/ic_notification" />
+    <!-- FCM: notification accent color -->
+    <meta-data
+        android:name="com.google.firebase.messaging.default_notification_color"
+        android:resource="@color/notification_color" />
 </application>
     <queries>
         <intent>

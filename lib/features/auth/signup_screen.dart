@@ -4,6 +4,8 @@ import 'package:unisharesync_mobile_app/data/models/user_role.dart';
 import 'package:unisharesync_mobile_app/features/auth/legal_documents_screen.dart';
 import 'package:unisharesync_mobile_app/features/auth/verify_signup_otp_screen.dart';
 import 'package:unisharesync_mobile_app/services/auth_service.dart';
+import 'package:unisharesync_mobile_app/core/config/constants.dart';
+
 
 enum AccountRole { student, faculty }
 
@@ -37,14 +39,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
   String? _selectedDepartment;
   String? _selectedSemester;
 
-  final List<String> _departments = const [
-    'Computer Science and Engineering (CSE)',
-    'Business Administration (BBA)',
-    'English (ENG)',
-    'Interior Architecture (IA)',
-    'Fashion Design and Technology (FDT)',
-    'Graphic Design & Multimedia (GDM)'
-  ];
+  final List<String> _departments = AppConstants.departments;
+
 
   final List<String> _semesters = const [
     'Semester 1',

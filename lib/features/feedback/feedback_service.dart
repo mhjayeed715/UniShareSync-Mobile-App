@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:unisharesync_mobile_app/data/models/user_role.dart';
 import 'package:unisharesync_mobile_app/features/feedback/feedback_model.dart';
 import 'package:unisharesync_mobile_app/services/profile_service.dart';
+import 'package:unisharesync_mobile_app/services/offline_cache_service.dart';
 
 class FeedbackService {
   FeedbackService({SupabaseClient? client, ProfileService? profileService})
@@ -10,32 +11,57 @@ class FeedbackService {
 
   final SupabaseClient _client;
   final ProfileService _profileService;
+  final OfflineCacheService _cache = OfflineCacheService.instance;
 
   String? get currentUserId => _client.auth.currentUser?.id;
 
-  Stream<List<FeedbackEntry>> watchFeedback({int limit = 200}) {
-    return _client
+  String _cacheKey(String suffix) => 'feedback_$suffix';
+
+  Stream<List<FeedbackEntry>> watchFeedback({int limit = 200}) async* {
+    final userId = currentUserId ?? 'guest';
+    final cacheKey = _cacheKey('entries_${userId}_$limit');
+    final cached = await _cache.readJsonList(cacheKey);
+    if (cached.isNotEmpty) {
+      yield cached.map(FeedbackEntry.fromMap).toList(growable: false);
+    }
+
+    try {
+      await for (final rows in _client
         .from('feedback_entries')
         .stream(primaryKey: const ['id'])
         .order('created_at', ascending: false)
         .limit(limit)
-        .map(
-          (rows) => rows
-              .map((row) => FeedbackEntry.fromMap(Map<String, dynamic>.from(row)))
-              .toList(growable: false),
-        );
+      ) {
+        await _cache.saveJsonList(cacheKey, rows);
+        yield rows
+            .map((row) => FeedbackEntry.fromMap(Map<String, dynamic>.from(row)))
+            .toList(growable: false);
+      }
+    } catch (_) {
+      if (cached.isEmpty) {
+        yield const <FeedbackEntry>[];
+      }
+    }
   }
 
   Future<List<FeedbackEntry>> fetchFeedback({int limit = 200}) async {
-    final response = await _client
-        .from('feedback_entries')
-        .select()
-        .order('created_at', ascending: false)
-        .limit(limit);
+    final cacheKey = _cacheKey('entries_${currentUserId ?? 'guest'}_$limit');
+    try {
+      final response = await _client
+          .from('feedback_entries')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(limit);
 
-    return (response as List<dynamic>)
-        .map((row) => FeedbackEntry.fromMap(Map<String, dynamic>.from(row)))
-        .toList(growable: false);
+      final rows = (response as List<dynamic>)
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList(growable: false);
+      await _cache.saveJsonList(cacheKey, rows);
+      return rows.map(FeedbackEntry.fromMap).toList(growable: false);
+    } catch (_) {
+      final cached = await _cache.readJsonList(cacheKey);
+      return cached.map(FeedbackEntry.fromMap).toList(growable: false);
+    }
   }
 
   Future<FeedbackEntry> createFeedback({required FeedbackDraft draft}) async {

@@ -335,7 +335,7 @@ class _ClassSchedulerScreenState extends State<ClassSchedulerScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const _SchedulerSkeleton();
     }
 
     if (_errorMessage != null) {
@@ -1056,6 +1056,72 @@ class _ClassSchedulerScreenState extends State<ClassSchedulerScreen> {
                   .map((room) => _AvailableRoomChip(room: room))
                   .toList(growable: false),
             ),
+    );
+  }
+}
+
+class _SchedulerSkeleton extends StatelessWidget {
+  const _SchedulerSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        Container(width: 180, height: 22, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(8))),
+        const SizedBox(height: 8),
+        Container(width: 260, height: 14, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(8))),
+        const SizedBox(height: 16),
+        Container(height: 44, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(14))),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(child: Container(height: 52, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(16)))),
+            const SizedBox(width: 10),
+            Expanded(child: Container(height: 52, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(16)))),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 38,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: 5,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (_, __) => Container(width: 72, height: 38, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(999))),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Expanded(
+          child: ListView.separated(
+            itemCount: 4,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (_, __) => Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(width: 200, height: 15, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(8))),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Container(width: 80, height: 12, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(8))),
+                      const SizedBox(width: 12),
+                      Container(width: 80, height: 12, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(8))),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

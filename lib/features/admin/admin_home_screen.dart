@@ -1,13 +1,13 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:unisharesync_mobile_app/data/models/profile_model.dart';
 import 'package:unisharesync_mobile_app/data/models/user_role.dart';
 import 'package:unisharesync_mobile_app/features/auth/login_screen.dart';
 import 'package:unisharesync_mobile_app/features/notice_board/admin_notice_board_screen.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_projects_screen.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_events_screen.dart';
-import 'package:unisharesync_mobile_app/features/admin/admin_clubs_screen.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_class_scheduler_screen.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_user_management_screen.dart';
 import 'package:unisharesync_mobile_app/features/feedback/feedback_screen.dart';
@@ -25,9 +25,11 @@ class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({
     super.key,
     this.isLocalAdmin,
+    this.initialProfile,
   });
 
   final bool? isLocalAdmin;
+  final ProfileModel? initialProfile;
 
   @override
   State<AdminHomeScreen> createState() => _AdminHomeScreenState();
@@ -192,6 +194,18 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   Future<void> _loadAdminContext() async {
+    // If splash pre-loaded the profile, skip network calls.
+    if (widget.initialProfile != null) {
+      final isLocalAdmin = widget.isLocalAdmin ?? false;
+      if (!mounted) return;
+      setState(() {
+        _profile = widget.initialProfile;
+        _isLocalAdmin = isLocalAdmin;
+        _isLoading = false;
+      });
+      return;
+    }
+
     final isLocalAdmin =
         widget.isLocalAdmin ?? await _authService.isLocalAdminSession();
 
@@ -223,6 +237,33 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     });
   }
 
+  Future<void> _handleSystemBack() async {
+    final shouldExit = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Exit app?'),
+            content: const Text(
+              'You are on the admin dashboard. Do you want to close the app?'
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Stay'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Exit'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (shouldExit) {
+      SystemNavigator.pop();
+    }
+  }
+
   Future<void> _openProfile() async {
     if (_isLocalAdmin) {
       _showSnackBar('Local admin mode does not support profile updates yet.');
@@ -250,14 +291,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           MaterialPageRoute(builder: (_) => const AdminAnalyticsScreen()),
         );
         break;
+      case 'role_control':
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AdminUserManagementScreen()),
+        );
+        break;
       case 'resources':
         await Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const AdminResourcesScreen()),
-        );
-        break;
-      case 'projects':
-        await Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const AdminProjectsScreen()),
         );
         break;
       case 'notices':
@@ -265,77 +306,34 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           MaterialPageRoute(builder: (_) => const AdminNoticeBoardScreen()),
         );
         break;
+      case 'projects':
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AdminProjectsScreen()),
+        );
+        break;
+      case 'events_clubs':
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AdminEventsScreen()),
+        );
+        break;
+      case 'scheduler':
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AdminClassSchedulerScreen()),
+        );
+        break;
       case 'lost_found':
         await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => LostFoundScreen(
-              initialRole: UserRole.admin,
-              isLocalAdmin: _isLocalAdmin,
-            ),
-          ),
+          MaterialPageRoute(builder: (_) => const LostFoundScreen()),
         );
         break;
       case 'feedback':
         await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => FeedbackScreen(
-              initialRole: UserRole.admin,
-              isLocalAdmin: _isLocalAdmin,
-            ),
-          ),
-        );
-        break;
-      case 'events_clubs':
-        final choice = await showDialog<String>(
-          context: context,
-          builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: const Text('Manage Events & Clubs'),
-            content: const Text('Choose what to manage:'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, 'events'),
-                child: const Text('Events'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, 'clubs'),
-                child: const Text('Clubs'),
-              ),
-            ],
-          ),
-        );
-        if (!mounted) return;
-        if (choice == 'events') {
-          await Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const AdminEventsScreen()),
-          );
-        } else if (choice == 'clubs') {
-          await Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const AdminClubsScreen()),
-          );
-        }
-        break;
-      case 'scheduler':
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => const AdminClassSchedulerScreen(),
-          ),
-        );
-        break;
-      case 'role_control':
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => const AdminUserManagementScreen(),
-          ),
+          MaterialPageRoute(builder: (_) => const FeedbackScreen()),
         );
         break;
       case 'notifications':
         await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => const NotificationCenterScreen(),
-          ),
+          MaterialPageRoute(builder: (_) => const NotificationCenterScreen()),
         );
         break;
       case 'ai_assistant':
@@ -347,8 +345,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         await Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => BusTrackerScreen(
-              currentUserName:
-                  _profile?.fullName ?? 'UniShareSync Admin',
+              currentUserName: _profile?.fullName ?? 'UniShareSync Admin',
             ),
           ),
         );

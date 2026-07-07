@@ -1,32 +1,53 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:unisharesync_mobile_app/data/models/resource_item.dart';
+import 'package:unisharesync_mobile_app/services/offline_cache_service.dart';
 
 class ResourceService {
   ResourceService({SupabaseClient? client})
       : _client = client ?? Supabase.instance.client;
 
   final SupabaseClient _client;
+  final OfflineCacheService _cache = OfflineCacheService.instance;
 
   String? get currentUserId => _client.auth.currentUser?.id;
+
+  String _cacheKey(String suffix) => 'resources_$suffix';
 
   Future<List<CourseOption>> fetchCourseOptions({
     int? semesterNo,
   }) async {
-    var query = _client.from('v_course_options_by_semester').select();
+    final cacheKey = _cacheKey('course_options_${semesterNo ?? 'all'}');
+    try {
+      var query = _client.from('v_course_options_by_semester').select();
 
-    if (semesterNo != null) {
-      query = query.eq('semester_no', semesterNo);
+      if (semesterNo != null) {
+        query = query.eq('semester_no', semesterNo);
+      }
+
+      final response = await query.order('semester_no').order('course_code');
+      final rows = (response as List<dynamic>)
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList(growable: false);
+
+      await _cache.saveJsonList(cacheKey, rows);
+
+      return rows
+          .map(CourseOption.fromMap)
+          .where((option) =>
+              option.semesterNo > 0 &&
+              option.courseCode.trim().isNotEmpty &&
+              option.courseTitle.trim().isNotEmpty)
+          .toList(growable: false);
+    } catch (_) {
+      final cached = await _cache.readJsonList(cacheKey);
+      return cached
+          .map(CourseOption.fromMap)
+          .where((option) =>
+              option.semesterNo > 0 &&
+              option.courseCode.trim().isNotEmpty &&
+              option.courseTitle.trim().isNotEmpty)
+          .toList(growable: false);
     }
-
-    final response = await query.order('semester_no').order('course_code');
-
-    return (response as List<dynamic>)
-        .map((row) => CourseOption.fromMap(Map<String, dynamic>.from(row)))
-        .where((option) =>
-            option.semesterNo > 0 &&
-            option.courseCode.trim().isNotEmpty &&
-            option.courseTitle.trim().isNotEmpty)
-        .toList(growable: false);
   }
 
   Future<List<ResourceItem>> searchResources({
@@ -37,6 +58,9 @@ class ResourceService {
     int limit = 40,
     int offset = 0,
   }) async {
+    final cacheKey = _cacheKey(
+      'search_${currentUserId ?? 'guest'}_${query ?? ''}_${semesterNo ?? 'all'}_${courseCode ?? ''}_${fileType?.value ?? 'all'}_${limit}_$offset',
+    );
     final params = <String, dynamic>{
       'p_query': (query ?? '').trim().isEmpty ? null : query!.trim(),
       'p_semester_no': semesterNo,
@@ -46,12 +70,21 @@ class ResourceService {
       'p_offset': offset,
     };
 
-    final response = await _client.rpc('search_resources', params: params);
-
-    return (response as List<dynamic>)
-        .map((row) =>
-            ResourceItem.fromSearchMap(Map<String, dynamic>.from(row as Map)))
-        .toList(growable: false);
+    try {
+      final response = await _client.rpc('search_resources', params: params);
+      final rows = (response as List<dynamic>)
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList(growable: false);
+      await _cache.saveJsonList(cacheKey, rows);
+      return rows
+          .map((row) => ResourceItem.fromSearchMap(row))
+          .toList(growable: false);
+    } catch (_) {
+      final cached = await _cache.readJsonList(cacheKey);
+      return cached
+          .map((row) => ResourceItem.fromSearchMap(row))
+          .toList(growable: false);
+    }
   }
 
   Future<ResourceItem> uploadResource({
@@ -91,13 +124,42 @@ class ResourceService {
     final resolvedCourseTitle = await _resolveCourseTitle(courseCode);
     final uploader = await _resolveUploader(user.id);
 
-    return ResourceItem.fromResourceTableMap(
+    final item = ResourceItem.fromResourceTableMap(
       Map<String, dynamic>.from(inserted),
       resolvedCourseTitle: resolvedCourseTitle,
     )._withUploader(
       name: uploader.name,
       avatarUrl: uploader.avatarUrl,
     );
+
+    if (item.approvalStatus == ResourceApprovalStatus.approved) {
+      await _notifySemesterStudents(
+        semesterNo: semesterNo,
+        title: 'New Resource Available',
+        body: 'A new resource "${item.title}" was posted for semester $semesterNo.',
+        type: 'resource_update',
+        data: {
+          'resource_id': item.id,
+          'semester_no': semesterNo.toString(),
+        },
+      );
+    } else {
+      // Pending approval — notify admins so they can review
+      try {
+        await _client.functions.invoke(
+          'send-push-notification',
+          body: {
+            'type': 'resource_update',
+            'title': 'New Resource Pending Review',
+            'body': '"${item.title}" was submitted for semester $semesterNo and needs approval.',
+            'targetRoles': ['admin'],
+            'data': {'resource_id': item.id},
+          },
+        );
+      } catch (_) {}
+    }
+
+    return item;
   }
 
   Future<void> updateResource({
@@ -148,14 +210,62 @@ class ResourceService {
     required bool approve,
     String? rejectionReason,
   }) async {
-    await _client.rpc(
-      'review_resource_submission',
-      params: {
-        'p_resource_id': resourceId,
-        'p_action': approve ? 'approve' : 'reject',
-        'p_rejection_reason': _nullIfBlank(rejectionReason),
-      },
-    );
+    try {
+      // 1. Fetch resource details (uploader_id and title) BEFORE the RPC action
+      final resource = await _client
+          .from('resources')
+          .select('uploader_id, title, semester_no')
+          .eq('id', resourceId)
+          .single();
+      final uploaderId = resource['uploader_id'] as String;
+      final resourceTitle = resource['title'] as String;
+
+      // 2. Perform the review action via RPC
+      await _client.rpc(
+        'review_resource_submission',
+        params: {
+          'p_resource_id': resourceId,
+          'p_action': approve ? 'approve' : 'reject',
+          'p_rejection_reason': _nullIfBlank(rejectionReason),
+        },
+      );
+
+      // 3. Send push notification to uploader
+      final String title = approve ? 'Resource Approved' : 'Resource Rejected';
+      final String body = approve
+          ? 'Your resource "$resourceTitle" has been approved and published.'
+          : 'Your resource "$resourceTitle" was rejected.${rejectionReason != null && rejectionReason.trim().isNotEmpty ? ' Reason: $rejectionReason' : ''}';
+
+      await _sendPushNotification(
+        userId: uploaderId,
+        title: title,
+        body: body,
+        type: 'resource_update',
+        data: {
+          'resource_id': resourceId,
+          'status': approve ? 'approved' : 'rejected',
+        },
+      );
+
+      if (approve) {
+        final semesterNo = resource['semester_no'];
+        if (semesterNo != null) {
+          await _notifySemesterStudents(
+            semesterNo: int.parse(semesterNo.toString()),
+            title: 'New Resource Available',
+            body: 'A new resource "$resourceTitle" was published for your semester.',
+            type: 'resource_update',
+            data: {
+              'resource_id': resourceId,
+              'semester_no': semesterNo.toString(),
+            },
+          );
+        }
+      }
+    } catch (e) {
+      print('DEBUG: Review resource error: $e');
+      rethrow;
+    }
   }
 
   Future<int> recordDownload({
@@ -229,6 +339,55 @@ class ResourceService {
       return null;
     }
     return normalized;
+  }
+
+  Future<void> _notifySemesterStudents({
+    required int semesterNo,
+    required String title,
+    required String body,
+    required String type,
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      await _client.functions.invoke(
+        'send-push-notification',
+        body: {
+          'type': type,
+          'title': title,
+          'body': body,
+          'targetRoles': ['student'],
+          'targetSemesters': [semesterNo],
+          // No skipInApp — edge function handles in-app insert for semester-wide sends
+          if (data != null) 'data': data,
+        },
+      );
+    } catch (e) {
+      print('ERROR [Push] Failed to send semester notification: $e');
+    }
+  }
+
+  Future<void> _sendPushNotification({
+    required String userId,
+    required String title,
+    required String body,
+    required String type,
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      await _client.functions.invoke(
+        'send-push-notification',
+        body: {
+          'type': type,
+          'title': title,
+          'body': body,
+          'userId': userId,
+          'skipInApp': false,
+          if (data != null) 'data': data,
+        },
+      );
+    } catch (e) {
+      print('ERROR [Push] Failed to send resource notification: $e');
+    }
   }
 }
 

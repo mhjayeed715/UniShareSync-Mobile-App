@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:unisharesync_mobile_app/data/models/user_role.dart';
@@ -50,42 +49,78 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _navigateNext() async {
-    await Future<void>.delayed(const Duration(seconds: 3));
+    final store = _authService.localSessionStore;
 
-    if (!mounted) {
-      return;
-    }
+    // Read all session flags + pre-fetch role/profile in parallel with the
+    // minimum splash display time — no extra wait after data is ready.
+    final prefsF = store.getPrefs();
+    final roleF = _authService.getCurrentRole().timeout(
+      const Duration(seconds: 6),
+      onTimeout: () => null,
+    );
+    final profileF = _authService.getCurrentProfile().timeout(
+      const Duration(seconds: 6),
+      onTimeout: () => null,
+    );
 
-    final hasSession = await _authService.hasActiveSession();
+    final results = await Future.wait([
+      prefsF,
+      roleF,
+      profileF,
+      Future<void>.delayed(const Duration(milliseconds: 400)),
+    ]);
+
+    if (!mounted) return;
+
+    final prefs = results[0] as dynamic;
+    final role = results[1] as UserRole?;
+    final profile = results[2] as dynamic;
+
+    final isLocalAdmin = prefs.getBool('local_admin_signed_in') ?? false;
+    final driverEmail = prefs.getString('driver_email') as String?;
+    final supabaseWasActive = prefs.getBool('supabase_session_was_active') ?? false;
+    final demoActive = prefs.getBool('demo_session_active') ?? false;
+    final demoUserId = prefs.getString('demo_session_user_id') as String?;
+
     late final Widget nextScreen;
 
-    if (!hasSession) {
-      nextScreen = const OnboardingScreen();
-    } else {
-      final role = await _authService.getCurrentRole();
-      final isLocalAdmin = await _authService.isLocalAdminSession();
-
-      if (role == UserRole.driver) {
-        final store = _authService.localSessionStore;
-        final session = await store.getDriverSession();
-        nextScreen = DriverHomeScreen(
-          driverName: session?['name'] ?? 'Driver',
-          assignedRouteId: session?['routeId'] ?? '',
+    if (isLocalAdmin) {
+      nextScreen = const AdminHomeScreen(isLocalAdmin: true);
+    } else if (driverEmail != null) {
+      final session = await store.getDriverSession();
+      nextScreen = DriverHomeScreen(
+        driverName: session?['name'] ?? 'Driver',
+        assignedRouteId: session?['routeId'] ?? '',
+      );
+    } else if (demoActive && demoUserId != null) {
+      final cachedProfile = await store.getCachedProfile(demoUserId);
+      final resolvedRole = cachedProfile?.role ?? UserRole.student;
+      nextScreen = RoleHomeScreen(
+        initialRole: resolvedRole,
+        initialProfile: cachedProfile,
+        isLocalAdmin: false,
+      );
+    } else if (supabaseWasActive) {
+      final resolvedRole = role ?? UserRole.student;
+      if (resolvedRole == UserRole.admin) {
+        nextScreen = AdminHomeScreen(
+          isLocalAdmin: false,
+          initialProfile: profile,
         );
       } else {
-        final isAdminSession = role == UserRole.admin || isLocalAdmin;
-        nextScreen = isAdminSession
-            ? AdminHomeScreen(isLocalAdmin: isLocalAdmin)
-            : RoleHomeScreen(initialRole: role, isLocalAdmin: isLocalAdmin);
+        nextScreen = RoleHomeScreen(
+          initialRole: resolvedRole,
+          initialProfile: profile,
+          isLocalAdmin: false,
+        );
       }
+    } else {
+      nextScreen = const OnboardingScreen();
     }
 
-    if (!mounted) {
-      return;
-    }
-
+    if (!mounted) return;
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (context) => nextScreen),
+      MaterialPageRoute(builder: (_) => nextScreen),
     );
   }
 
@@ -195,31 +230,27 @@ class _SplashScreenState extends State<SplashScreen>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(30),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 46,
-                          vertical: 56,
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 46,
+                      vertical: 56,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.82),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.95),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF4F9EFF).withOpacity(0.16),
+                          blurRadius: 36,
+                          spreadRadius: 0,
+                          offset: const Offset(0, 14),
                         ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.62),
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.85),
-                            width: 1.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF4F9EFF).withOpacity(0.16),
-                              blurRadius: 36,
-                              spreadRadius: 0,
-                              offset: const Offset(0, 14),
-                            ),
-                          ],
-                        ),
+                      ],
+                    ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -291,8 +322,6 @@ class _SplashScreenState extends State<SplashScreen>
                             ),
                           ],
                         ),
-                      ),
-                    ),
                   ),
                 ],
               ),

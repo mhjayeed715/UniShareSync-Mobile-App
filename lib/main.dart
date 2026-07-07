@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'dart:io';
-import 'package:unisharesync_mobile_app/core/utils/notification_permission.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:unisharesync_mobile_app/services/push_notification_service.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../core/config/app_secrets.dart';
@@ -13,9 +16,6 @@ Future<void> main() async {
   // Ensure Flutter bindings are initialized before any async operations
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialise Firebase
-  // On Android, google-services.json + the Gradle plugin provide config
-  // automatically. On Web, explicit options are required.
   if (kIsWeb) {
     const FirebaseOptions webFirebaseOptions = FirebaseOptions(
       apiKey: "AIzaSyCMKXTk2EuoCqTWS6A6DTQy4FQ0LiyIT34",
@@ -32,26 +32,29 @@ Future<void> main() async {
     await Firebase.initializeApp();
   }
 
-  // Request runtime notification permission on Android
-  if (!kIsWeb && Platform.isAndroid) {
-    await NotificationPermission.ensureGranted();
-  }
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-  // Initialize Hive
   await Hive.initFlutter();
 
-  // Initialize Supabase
   await Supabase.initialize(
     url: AppSecrets.supabaseUrl,
     anonKey: AppSecrets.supabaseAnonKey,
   );
 
-  // Init bus timetable cache — non-fatal if it fails
-  try {
-    await BusTrackerService.instance.initTimetable();
-  } catch (_) {}
-
   runApp(const UniShareSyncApp());
+
+  unawaited(_bootstrapAppServices());
+}
+
+Future<void> _bootstrapAppServices() async {
+  try {
+    final initialUserId = Supabase.instance.client.auth.currentUser?.id;
+    await PushNotificationService.instance.init(userId: initialUserId);
+
+    await BusTrackerService.instance.initTimetable();
+  } catch (_) {
+    // Non-critical startup services should not block the first screen.
+  }
 }
 
 class UniShareSyncApp extends StatelessWidget {
@@ -59,14 +62,42 @@ class UniShareSyncApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Lock to portrait and request high-refresh-rate rendering
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
     return MaterialApp(
       title: 'UniShareSync',
       debugShowCheckedModeBanner: false,
+      // Smooth physics that feel natural on 90/120 Hz displays
+      scrollBehavior: const _SmoothScrollBehavior(),
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF4F9EFF)),
         useMaterial3: true,
+        // Disable the ink splash ripple delay so taps feel instant
+        splashFactory: InkRipple.splashFactory,
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          },
+        ),
       ),
       home: const SplashScreen(),
     );
   }
+}
+
+class _SmoothScrollBehavior extends ScrollBehavior {
+  const _SmoothScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) =>
+      const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+
+  @override
+  Widget buildOverscrollIndicator(
+          BuildContext context, Widget child, ScrollableDetails details) =>
+      child; // remove the glow overscroll indicator
 }

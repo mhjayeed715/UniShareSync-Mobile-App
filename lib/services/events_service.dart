@@ -140,7 +140,23 @@ class EventsService {
         .select()
         .single();
 
-    return EventModel.fromMap(Map<String, dynamic>.from(inserted));
+    final event = EventModel.fromMap(Map<String, dynamic>.from(inserted));
+
+    // Notify all students and faculty about the new event
+    try {
+      await _client.functions.invoke(
+        'send-push-notification',
+        body: {
+          'type': 'event',
+          'title': 'New Event: ${title.trim()}',
+          'body': '${organizerClub.trim()} is hosting an event at $venue on ${date.day}/${date.month}/${date.year}.',
+          'targetRoles': ['student', 'faculty'],
+          'data': {'event_id': event.id},
+        },
+      );
+    } catch (_) {}
+
+    return event;
   }
 
   // Update event

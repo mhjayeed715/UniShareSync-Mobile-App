@@ -2,6 +2,9 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:unisharesync_mobile_app/services/offline_cache_service.dart';
+
+const _kLogoPath = 'lib/assets/logos/unisharesync.png';
 
 class NotificationCenterScreen extends StatefulWidget {
   const NotificationCenterScreen({super.key});
@@ -13,42 +16,100 @@ class NotificationCenterScreen extends StatefulWidget {
 
 class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
   final _supabase = Supabase.instance.client;
-  late final Stream<List<Map<String, dynamic>>> _noticesStream;
-  late final Stream<List<Map<String, dynamic>>> _systemNotificationsStream;
-  late final Stream<List<Map<String, dynamic>>> _readStatusStream;
-  late final Stream<List<Map<String, dynamic>>> _dismissedStream;
+  final _cache = OfflineCacheService.instance;
+  late Stream<List<Map<String, dynamic>>> _noticesStream;
+  late Stream<List<Map<String, dynamic>>> _systemNotificationsStream;
+  late Stream<List<Map<String, dynamic>>> _readStatusStream;
+  late Stream<List<Map<String, dynamic>>> _dismissedStream;
+  late final Future<Map<String, dynamic>> _userRoleFuture;
 
   @override
   void initState() {
     super.initState();
-    final userId = _supabase.auth.currentUser?.id ?? '';
+    final userId = _supabase.auth.currentUser?.id;
 
-    _noticesStream = _supabase
-        .from('notices')
-        .stream(primaryKey: const ['id'])
-        .order('created_at', ascending: false)
-        .limit(100)
-        .map((rows) => rows.cast<Map<String, dynamic>>());
+    // Cache the role future once — not re-fired on every stream rebuild
+    _userRoleFuture = _getUserRoleAndSemester();
 
-    _systemNotificationsStream = _supabase
-      .from('notifications')
-      .stream(primaryKey: const ['id'])
-      .eq('user_id', userId)
-      .order('created_at', ascending: false)
-      .limit(100)
-      .map((rows) => rows.cast<Map<String, dynamic>>());
-    
-    _readStatusStream = _supabase
-        .from('notice_reads')
-        .stream(primaryKey: const ['id'])
-      .eq('user_id', userId)
-        .map((rows) => rows.cast<Map<String, dynamic>>());
-    
-    _dismissedStream = _supabase
-        .from('dismissed_notices')
-        .stream(primaryKey: const ['id'])
-      .eq('user_id', userId)
-        .map((rows) => rows.cast<Map<String, dynamic>>());
+    _initializeStreams(userId);
+  }
+
+  void _initializeStreams(String? userId) {
+    _noticesStream = _watchCachedRows(
+      cacheKey: 'notification_center_notices_${userId ?? 'guest'}',
+      source: _supabase
+          .from('notices')
+          .stream(primaryKey: const ['id'])
+          .order('created_at', ascending: false)
+          .limit(100)
+          .map((rows) => rows.cast<Map<String, dynamic>>()),
+    );
+
+    if (userId != null) {
+      _systemNotificationsStream = _watchCachedRows(
+        cacheKey: 'notification_center_updates_$userId',
+        source: _supabase
+            .from('notifications')
+            .stream(primaryKey: const ['id'])
+            .eq('user_id', userId)
+            .order('created_at', ascending: false)
+            .limit(100)
+            .map((rows) => rows.cast<Map<String, dynamic>>()),
+      );
+
+      _readStatusStream = _watchCachedRows(
+        cacheKey: 'notification_center_reads_$userId',
+        source: _supabase
+            .from('notice_reads')
+            .stream(primaryKey: const ['id'])
+            .eq('user_id', userId)
+            .map((rows) => rows.cast<Map<String, dynamic>>()),
+      );
+
+      _dismissedStream = _watchCachedRows(
+        cacheKey: 'notification_center_dismissed_$userId',
+        source: _supabase
+            .from('dismissed_notices')
+            .stream(primaryKey: const ['id'])
+            .eq('user_id', userId)
+            .map((rows) => rows.cast<Map<String, dynamic>>()),
+      );
+    } else {
+      _systemNotificationsStream = const Stream.empty();
+      _readStatusStream = const Stream.empty();
+      _dismissedStream = const Stream.empty();
+    }
+  }
+
+  void _refreshStreams() {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _initializeStreams(_supabase.auth.currentUser?.id);
+    });
+  }
+
+  Stream<List<Map<String, dynamic>>> _watchCachedRows({
+    required String cacheKey,
+    required Stream<List<Map<String, dynamic>>> source,
+  }) async* {
+    final cached = await _cache.readJsonList(cacheKey);
+    if (cached.isNotEmpty) {
+      yield cached;
+    }
+
+    try {
+      await for (final rows in source) {
+        await _cache.saveJsonList(cacheKey, rows);
+        yield rows;
+      }
+    } catch (_) {
+      if (cached.isEmpty) {
+        yield const <Map<String, dynamic>>[];
+      }
+    }
   }
 
   Future<Map<String, dynamic>> _getUserRoleAndSemester() async {
@@ -321,32 +382,21 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return const _NotificationListSkeleton();
         }
 
         if (snapshot.hasError) {
-          return Center(
-            child: Text('Error: ${snapshot.error}',
-                style: const TextStyle(color: Color(0xFF64748B))),
+          return _NotificationErrorState(
+            message: 'Unable to load notices.',
+            onRetry: _refreshStreams,
           );
         }
 
         final notices = snapshot.data ?? [];
         if (notices.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.notifications_none_rounded,
-                    size: 64, color: Colors.grey.shade400),
-                const SizedBox(height: 16),
-                Text('No notices yet',
-                    style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600)),
-              ],
-            ),
+          return const _NotificationEmptyState(
+            title: 'No notices yet',
+            subtitle: 'New notices will appear here when posted.',
           );
         }
 
@@ -357,7 +407,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
               stream: _dismissedStream,
               builder: (context, dismissedSnapshot) {
                 return FutureBuilder<Map<String, dynamic>>(
-                  future: _getUserRoleAndSemester(),
+                  future: _userRoleFuture,
                   builder: (context, userSnapshot) {
                     if (!userSnapshot.hasData) {
                       return const Center(child: CircularProgressIndicator());
@@ -447,32 +497,21 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return const _NotificationListSkeleton();
         }
 
         if (snapshot.hasError) {
-          return Center(
-            child: Text('Error: ${snapshot.error}',
-                style: const TextStyle(color: Color(0xFF64748B))),
+          return _NotificationErrorState(
+            message: 'Unable to load updates.',
+            onRetry: _refreshStreams,
           );
         }
 
         final notifications = snapshot.data ?? [];
         if (notifications.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.notifications_none_rounded,
-                    size: 64, color: Colors.grey.shade400),
-                const SizedBox(height: 16),
-                Text('No updates yet',
-                    style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600)),
-              ],
-            ),
+          return const _NotificationEmptyState(
+            title: 'No updates yet',
+            subtitle: 'System notifications will show up here.',
           );
         }
 
@@ -506,6 +545,83 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
           },
         );
       },
+    );
+  }
+}
+
+class _NotificationListSkeleton extends StatelessWidget {
+  const _NotificationListSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+      itemCount: 4,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (_, __) => _GlassCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(width: 84, height: 14, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(999))),
+            const SizedBox(height: 10),
+            Container(width: double.infinity, height: 12, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(8))),
+            const SizedBox(height: 8),
+            Container(width: 180, height: 12, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(8))),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationErrorState extends StatelessWidget {
+  const _NotificationErrorState({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: _GlassCard(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_rounded, size: 34, color: Color(0xFF64748B)),
+            const SizedBox(height: 8),
+            Text(message, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            TextButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationEmptyState extends StatelessWidget {
+  const _NotificationEmptyState({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.notifications_none_rounded, size: 64, color: Colors.grey.shade400),
+          const SizedBox(height: 16),
+          Text(title, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Text(subtitle, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF64748B))),
+        ],
+      ),
     );
   }
 }
@@ -546,6 +662,8 @@ class _NotificationCard extends StatelessWidget {
         'error' => Icons.error_outline,
         _ => Icons.info_outlined,
       };
+
+  bool get _isEventType => type == 'info' || type == 'event';
 
   String _relativeTime(DateTime dt) {
     final delta = DateTime.now().difference(dt);
@@ -593,7 +711,22 @@ class _NotificationCard extends StatelessWidget {
                           color: typeColor.withOpacity(0.14),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Icon(_getTypeIcon(), color: typeColor, size: 22),
+                        child: _isEventType
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.asset(
+                                  _kLogoPath,
+                                  width: 40,
+                                  height: 40,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => Icon(
+                                    _getTypeIcon(),
+                                    color: typeColor,
+                                    size: 22,
+                                  ),
+                                ),
+                              )
+                            : Icon(_getTypeIcon(), color: typeColor, size: 22),
                       ),
                       if (!isRead)
                         Positioned(
@@ -724,6 +857,38 @@ class _NotificationCard extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassCard extends StatelessWidget {
+  const _GlassCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.82),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withOpacity(0.95)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF4F9EFF).withOpacity(0.08),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: child,
         ),
       ),
     );

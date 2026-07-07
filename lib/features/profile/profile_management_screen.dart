@@ -182,7 +182,7 @@ class _ProfileManagementScreenState extends State<ProfileManagementScreen> {
         surfaceTintColor: Colors.transparent,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const _ProfileSkeleton()
           : profile == null
               ? const Center(
                   child: Padding(
@@ -291,6 +291,44 @@ class _ProfileManagementScreenState extends State<ProfileManagementScreen> {
                     ),
                   ),
                 ),
+    );
+  }
+}
+
+class _ProfileSkeleton extends StatelessWidget {
+  const _ProfileSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Column(
+              children: [
+                Container(width: 92, height: 92, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), shape: BoxShape.circle)),
+                const SizedBox(height: 10),
+                Container(width: 140, height: 14, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(8))),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          ...List.generate(5, (_) => Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(width: 80, height: 13, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(6))),
+                const SizedBox(height: 8),
+                Container(width: double.infinity, height: 48, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(14))),
+              ],
+            ),
+          )),
+          Container(width: double.infinity, height: 52, decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(14))),
+        ],
+      ),
     );
   }
 }

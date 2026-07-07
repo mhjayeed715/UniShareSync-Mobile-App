@@ -171,10 +171,35 @@ class ProjectsService {
   Future<void> requestJoinProject(String projectId) async {
     try {
       print('DEBUG: Requesting to join project: $projectId');
+      
+      // 1. Fetch project owner and title BEFORE RPC call
+      final project = await _client
+          .from('projects')
+          .select('owner_id, title')
+          .eq('id', projectId)
+          .single();
+      final ownerId = project['owner_id'] as String;
+      final projectTitle = project['title'] as String;
+
+      // 2. Perform the RPC join request
       await _client.rpc('request_project_join', params: {
         'p_project_id': projectId,
       });
       print('DEBUG: Join request successful');
+
+      // 3. Fetch current user's profile to get their name
+      final profile = await _profileService.getCurrentProfile();
+      final senderName = profile?.fullName ?? 'A student';
+
+      // 4. Send push notification to project owner
+      await _sendPushNotification(
+        userId: ownerId,
+        title: 'New Join Request',
+        body: '$senderName wants to join your project "$projectTitle"',
+        type: 'project_request',
+        data: {'project_id': projectId},
+        skipInApp: false,
+      );
     } catch (e) {
       print('DEBUG: Join request error: $e');
       rethrow;
@@ -185,10 +210,50 @@ class ProjectsService {
     required String requestId,
     required bool approve,
   }) async {
-    await _client.rpc('review_project_join_request', params: {
-      'p_request_id': requestId,
-      'p_action': approve ? 'approve' : 'reject',
-    });
+    try {
+      // 1. Fetch request details first (requester_id, project_id, and project title)
+      final request = await _client
+          .from('project_join_requests')
+          .select('requester_id, project_id, projects(title)')
+          .eq('id', requestId)
+          .single();
+      
+      final requesterId = request['requester_id'] as String;
+      final projectId = request['project_id'] as String;
+      final projectMap = request['projects'] as Map<String, dynamic>;
+      final projectTitle = projectMap['title'] as String;
+      
+      // Get owner's profile to get owner's name
+      final ownerProfile = await _profileService.getCurrentProfile();
+      final ownerName = ownerProfile?.fullName ?? 'Project Owner';
+
+      // 2. Perform the review action via RPC
+      await _client.rpc('review_project_join_request', params: {
+        'p_request_id': requestId,
+        'p_action': approve ? 'approve' : 'reject',
+      });
+
+      // 3. Send push notification to requester
+      final String title = approve ? 'Join Request Approved' : 'Join Request Declined';
+      final String body = approve
+          ? '$ownerName approved your request to join "$projectTitle"'
+          : 'Your request to join "$projectTitle" was declined';
+
+      await _sendPushNotification(
+        userId: requesterId,
+        title: title,
+        body: body,
+        type: 'project_request',
+        data: {
+          'project_id': projectId,
+          'status': approve ? 'approved' : 'rejected',
+        },
+        skipInApp: false,
+      );
+    } catch (e) {
+      print('DEBUG: Review join request error: $e');
+      rethrow;
+    }
   }
 
   Future<List<ProjectJoinRequest>> fetchJoinRequests(String projectId) async {
@@ -338,4 +403,28 @@ class ProjectsService {
     }
   }
 
+  Future<void> _sendPushNotification({
+    required String userId,
+    required String title,
+    required String body,
+    required String type,
+    Map<String, dynamic>? data,
+    bool skipInApp = false,
+  }) async {
+    try {
+      await _client.functions.invoke(
+        'send-push-notification',
+        body: {
+          'type': type,
+          'title': title,
+          'body': body,
+          'userId': userId,
+          'skipInApp': skipInApp,
+          if (data != null) 'data': data,
+        },
+      );
+    } catch (e) {
+      print('ERROR [Push] Failed to send project notification: $e');
+    }
+  }
 }

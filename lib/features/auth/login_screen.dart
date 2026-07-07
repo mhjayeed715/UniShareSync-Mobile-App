@@ -9,6 +9,7 @@ import 'package:unisharesync_mobile_app/features/admin/admin_home_screen.dart';
 import 'package:unisharesync_mobile_app/features/bus_tracker/driver_home_screen.dart';
 import 'package:unisharesync_mobile_app/features/dashboard/role_home_screen.dart';
 import 'package:unisharesync_mobile_app/services/auth_service.dart';
+import 'package:unisharesync_mobile_app/services/push_notification_service.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -47,7 +48,7 @@ class _SignInScreenState extends State<SignInScreen> {
     super.dispose();
   }
 
-  bool _isUniversityEmail(String email) {
+  bool _isValidEmail(String email) {
     final value = email.trim().toLowerCase();
     // Allow fixed demo accounts
     if (value == AppSecrets.fixedAdminEmail.toLowerCase() ||
@@ -56,12 +57,11 @@ class _SignInScreenState extends State<SignInScreen> {
     }
     // Allow predefined driver accounts
     if (AppSecrets.driverAccounts.any((d) => d[0] == value)) return true;
-    // University email pattern
-    final universityPattern = RegExp(
-      r'^[a-z0-9]+(?:\.[a-z0-9]+)*@[a-z][a-z0-9-]*\.ac\.bd$',
-    );
-    return universityPattern.hasMatch(value);
+    // Generic email validation pattern
+    final emailPattern = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+    return emailPattern.hasMatch(value);
   }
+
 
   String _parseSignInError(Object error) {
     final message = error.toString().toLowerCase();
@@ -121,6 +121,11 @@ class _SignInScreenState extends State<SignInScreen> {
 
       if (!mounted) {
         return;
+      }
+
+      final userId = session.user?.id;
+      if (userId != null) {
+        PushNotificationService.instance.init(userId: userId).catchError((_) {});
       }
 
       final isAdminSession =
@@ -420,8 +425,8 @@ class _SignInScreenState extends State<SignInScreen> {
                                     if (email.isEmpty) {
                                       return 'Email is required';
                                     }
-                                    if (!_isUniversityEmail(email)) {
-                                      return 'Use: studentname(.id optional)@universityname.ac.bd';
+                                    if (!_isValidEmail(email)) {
+                                      return 'Enter a valid email address';
                                     }
                                     return null;
                                   },
