@@ -19,7 +19,7 @@ class _CreateProjectDialogState extends State<CreateProjectDialog> {
   final _skillsController = TextEditingController();
 
   int? _selectedSemesterNo;
-  String? _selectedCategory;
+  ProjectCategory? _selectedCategory;
   int _maxMembers = 5;
   DateTime _deadline = DateTime.now().add(const Duration(days: 30));
   List<String> _skills = [];
@@ -35,19 +35,8 @@ class _CreateProjectDialogState extends State<CreateProjectDialog> {
     8,
     9,
     10,
-  ];
-
-  final _categories = [
-    'Mobile Development',
-    'Web Development',
-    'Desktop Application',
-    'AI & Machine Learning',
-    'Data Science',
-    'Game Development',
-    'IoT',
-    'Cloud Computing',
-    'DevOps',
-    'Other',
+    11,
+    12,
   ];
 
   bool get _isEditing => widget.existingProject != null;
@@ -201,10 +190,11 @@ class _CreateProjectDialogState extends State<CreateProjectDialog> {
                         const SizedBox(height: 16),
                         _buildLabel('Category'),
                         const SizedBox(height: 8),
-                        _buildDropdown<String>(
+                        _buildDropdown<ProjectCategory>(
                           value: _selectedCategory,
                           hint: 'Select category',
-                          items: _categories,
+                          items: ProjectCategory.values,
+                          labelBuilder: (cat) => cat.displayName,
                           onChanged: (value) {
                             setState(() {
                               _selectedCategory = value;

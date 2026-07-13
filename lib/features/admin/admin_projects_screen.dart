@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:unisharesync_mobile_app/data/models/project_model.dart';
 import 'package:unisharesync_mobile_app/services/projects_service.dart';
 import 'package:unisharesync_mobile_app/features/projects/create_project_dialog.dart';
+import 'package:unisharesync_mobile_app/features/projects/project_detail_screen.dart';
 
 class AdminProjectsScreen extends StatefulWidget {
   const AdminProjectsScreen({super.key});
@@ -234,11 +235,6 @@ class _AdminProjectsScreenState extends State<AdminProjectsScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _createProject,
-        backgroundColor: const Color(0xFF8B5CF6),
-        child: const Icon(Icons.add_rounded, color: Colors.white),
-      ),
     );
   }
 
@@ -266,18 +262,13 @@ class _AdminProjectsScreenState extends State<AdminProjectsScreen> {
     }
 
     if (_projects.isEmpty) {
-      return Center(
+      return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.folder_open, size: 48, color: Colors.grey),
-            const SizedBox(height: 16),
-            const Text('No projects found'),
-            const SizedBox(height: 8),
-            ElevatedButton(
-              onPressed: _createProject,
-              child: const Text('Create First Project'),
-            ),
+            Icon(Icons.folder_open, size: 48, color: Colors.grey),
+            SizedBox(height: 16),
+            Text('No projects found', style: TextStyle(color: Color(0xFF64748B))),
           ],
         ),
       );
@@ -291,11 +282,22 @@ class _AdminProjectsScreenState extends State<AdminProjectsScreen> {
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           final project = _projects[index];
-          return _AdminProjectCard(
-            project: project,
-            onEdit: () => _editProject(project),
-            onDelete: () => _deleteProject(project),
-            onStatusChange: (status) => _updateStatus(project, status),
+          return InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ProjectDetailScreen(projectId: project.id),
+                ),
+              ).then((_) => _loadProjects());
+            },
+            borderRadius: BorderRadius.circular(18),
+            child: _AdminProjectCard(
+              project: project,
+              onEdit: () => _editProject(project),
+              onDelete: () => _deleteProject(project),
+              onStatusChange: (status) => _updateStatus(project, status),
+            ),
           );
         },
       ),
@@ -378,7 +380,7 @@ class _SemesterFilter extends StatelessWidget {
         hint: const Text('All Semesters'),
         items: [
           const DropdownMenuItem(value: null, child: Text('All Semesters')),
-          ...List.generate(10, (i) => i + 1).map(
+          ...List.generate(12, (i) => i + 1).map(
             (sem) => DropdownMenuItem(
               value: sem,
               child: Text('Semester $sem'),
@@ -506,7 +508,7 @@ class _AdminProjectCard extends StatelessWidget {
                     ),
                     _InfoChip(
                       icon: Icons.category_rounded,
-                      label: project.category,
+                      label: project.category.displayName,
                     ),
                   ],
                 ),
