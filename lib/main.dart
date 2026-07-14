@@ -8,6 +8,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:unisharesync_mobile_app/services/push_notification_service.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/config/app_secrets.dart';
 import '../../features/splash/splash_screen.dart';
 import '../../features/bus_tracker/bus_tracker_service.dart';
@@ -41,7 +42,11 @@ Future<void> main() async {
     anonKey: AppSecrets.supabaseAnonKey,
   );
 
-  runApp(const UniShareSyncApp());
+  runApp(
+    const ProviderScope(
+      child: UniShareSyncApp(),
+    ),
+  );
 
   unawaited(_bootstrapAppServices());
 }

@@ -1,4 +1,4 @@
-class ClubModel {
+﻿class ClubModel {
   const ClubModel({
     required this.id,
     required this.name,
@@ -150,3 +150,4 @@ int _parseInt(dynamic value) {
   }
   return 0;
 }
+

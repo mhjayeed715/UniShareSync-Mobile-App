@@ -1,4 +1,4 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+﻿import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:unisharesync_mobile_app/data/models/event_model.dart';
 
 class EventParticipant {
@@ -44,7 +44,7 @@ class EventsService {
     if (query != null && query.trim().isNotEmpty) {
       final escaped = query.trim().replaceAll('%', r'\%');
       request = request.or(
-        'title.ilike.%$escaped%,description.ilike.%$escaped%,organizer_club.ilike.%$escaped%',
+        'title.ilike.%$escaped%,description.ilike.%$escaped%,organizing_community_name.ilike.%$escaped%',
       );
     }
 
@@ -109,7 +109,7 @@ class EventsService {
     required DateTime date,
     required String time,
     required String venue,
-    required String organizerClub,
+    required String organizingCommunityName,
     required int seatCapacity,
   }) async {
     final user = _client.auth.currentUser;
@@ -127,7 +127,7 @@ class EventsService {
       'date': date.toIso8601String(),
       'time': time.trim(),
       'venue': venue.trim(),
-      'organizer_club': organizerClub.trim(),
+      'organizing_community_name': organizingCommunityName.trim(),
       'seat_capacity': seatCapacity,
       'created_by': user.id,
       'created_by_name': profile['full_name'] ?? 'Organizer',
@@ -149,7 +149,7 @@ class EventsService {
         body: {
           'type': 'event',
           'title': 'New Event: ${title.trim()}',
-          'body': '${organizerClub.trim()} is hosting an event at $venue on ${date.day}/${date.month}/${date.year}.',
+          'body': '${organizingCommunityName.trim()} is hosting an event at $venue on ${date.day}/${date.month}/${date.year}.',
           'targetRoles': ['student', 'faculty'],
           'data': {'event_id': event.id},
         },
@@ -167,7 +167,7 @@ class EventsService {
     required DateTime date,
     required String time,
     required String venue,
-    required String organizerClub,
+    required String organizingCommunityName,
     required int seatCapacity,
   }) async {
     final payload = {
@@ -176,7 +176,7 @@ class EventsService {
       'date': date.toIso8601String(),
       'time': time.trim(),
       'venue': venue.trim(),
-      'organizer_club': organizerClub.trim(),
+      'organizing_community_name': organizingCommunityName.trim(),
       'seat_capacity': seatCapacity,
       'updated_at': DateTime.now().toIso8601String(),
     };
@@ -283,3 +283,4 @@ class EventsService {
         .toList();
   }
 }
+

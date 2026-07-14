@@ -15,11 +15,13 @@ import 'package:unisharesync_mobile_app/features/profile/profile_management_scre
 import 'package:unisharesync_mobile_app/features/projects/projects_screen.dart';
 import 'package:unisharesync_mobile_app/features/resources/resources_tab_view.dart';
 import 'package:unisharesync_mobile_app/features/scheduler/class_scheduler_screen.dart';
-import 'package:unisharesync_mobile_app/features/events_clubs/events_clubs_screen.dart';
+import 'package:unisharesync_mobile_app/features/events/presentation/screens/events_browse_screen.dart';
+import 'package:unisharesync_mobile_app/features/communities/presentation/screens/communities_browse_screen.dart';
 import 'package:unisharesync_mobile_app/features/lost_found/lost_found_screen.dart';
 import 'package:unisharesync_mobile_app/features/feedback/feedback_screen.dart';
 import 'package:unisharesync_mobile_app/features/ai_chat/ai_chat_screen.dart';
 import 'package:unisharesync_mobile_app/features/bus_tracker/bus_tracker_screen.dart';
+import 'package:unisharesync_mobile_app/features/item_share/campus_share_home_screen.dart';
 import 'package:unisharesync_mobile_app/services/auth_service.dart';
 import 'package:unisharesync_mobile_app/services/dashboard_feed_service.dart';
 
@@ -31,13 +33,15 @@ enum _MenuDestination {
   resources,
   noticeBoard,
   projects,
-  eventsAndClubs,
+  events,
+  communities,
   lostAndFound,
   feedback,
   notificationCenter,
   classScheduler,
   aiCampusAssistant,
   busTracker,
+  campusShare,
 }
 
 class _DashboardPalette {
@@ -57,6 +61,7 @@ class _DashboardPalette {
   static const Color feedbackIndigo = Color(0xFF6366F1);
   static const Color notificationSky = Color(0xFF0EA5E9);
   static const Color aiAssistantViolet = Color(0xFF7C3AED);
+  static const Color campusShareOrange = Color(0xFFF97316);
 }
 
 class RoleHomeScreen extends StatefulWidget {
@@ -565,9 +570,14 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
           MaterialPageRoute(builder: (_) => const ProjectsScreen()),
         );
         break;
-      case _MenuDestination.eventsAndClubs:
+      case _MenuDestination.events:
         await Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const EventsClubsScreen()),
+          MaterialPageRoute(builder: (_) => const EventsBrowseScreen()),
+        );
+        break;
+      case _MenuDestination.communities:
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const CommunitiesBrowseScreen()),
         );
         break;
       case _MenuDestination.lostAndFound:
@@ -611,6 +621,13 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
             builder: (_) => BusTrackerScreen(
               currentUserName: _profile?.fullName ?? 'Campus User',
             ),
+          ),
+        );
+        break;
+      case _MenuDestination.campusShare:
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const CampusShareHomeScreen(),
           ),
         );
         break;
@@ -1048,7 +1065,17 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
                 color: _DashboardPalette.eventsEmerald,
                 onTap: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const EventsClubsScreen()),
+                    MaterialPageRoute(builder: (_) => const EventsBrowseScreen()),
+                  );
+                },
+              ),
+              _QuickAccessTile(
+                icon: Icons.groups_rounded,
+                label: 'Communities',
+                color: const Color(0xFF8B5CF6),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const CommunitiesBrowseScreen()),
                   );
                 },
               ),
@@ -1077,6 +1104,18 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
                       builder: (_) => BusTrackerScreen(
                         currentUserName: _profile?.fullName ?? 'Campus User',
                       ),
+                    ),
+                  );
+                },
+              ),
+              _QuickAccessTile(
+                icon: Icons.swap_horiz_rounded,
+                label: 'CampusShare',
+                color: _DashboardPalette.campusShareOrange,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const CampusShareHomeScreen(),
                     ),
                   );
                 },
@@ -2059,9 +2098,16 @@ class _HamburgerMenuScreen extends StatelessWidget {
                     _SettingsRow(
                       icon: Icons.celebration_rounded,
                       iconColor: _DashboardPalette.eventsEmerald,
-                      label: 'Events & Clubs',
+                      label: 'Events & Seminars',
                       onTap: () =>
-                          _go(context, _MenuDestination.eventsAndClubs),
+                          _go(context, _MenuDestination.events),
+                    ),
+                    _SettingsRow(
+                      icon: Icons.groups_rounded,
+                      iconColor: const Color(0xFF8B5CF6),
+                      label: 'Communities',
+                      onTap: () =>
+                          _go(context, _MenuDestination.communities),
                     ),
                     _SettingsRow(
                       icon: Icons.search_rounded,
@@ -2088,6 +2134,12 @@ class _HamburgerMenuScreen extends StatelessWidget {
                       label: 'AI Campus Assistant',
                       onTap: () =>
                           _go(context, _MenuDestination.aiCampusAssistant),
+                    ),
+                    _SettingsRow(
+                      icon: Icons.swap_horiz_rounded,
+                      iconColor: _DashboardPalette.campusShareOrange,
+                      label: 'CampusShare',
+                      onTap: () => _go(context, _MenuDestination.campusShare),
                     ),
                   ],
                 ),

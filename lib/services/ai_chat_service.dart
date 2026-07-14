@@ -118,16 +118,16 @@ class AiChatService {
       final upcoming = DateTime.now().toIso8601String();
       final events = await _client
           .from('events')
-          .select('title, date, time, venue, organizer_club, status')
-          .gte('date', upcoming)
-          .order('date', ascending: true)
+          .select('title, event_date, venue, status')
+          .gte('event_date', upcoming)
+          .order('event_date', ascending: true)
           .limit(4);
 
       if ((events as List).isNotEmpty) {
         final buf = StringBuffer('UPCOMING EVENTS:\n');
         for (final e in events) {
           buf.writeln(
-            '• ${e['title']} | ${e['date']} at ${e['time']} | Venue: ${e['venue']} | By: ${e['organizer_club']} | Status: ${e['status']}',
+            '• ${e['title']} | ${e['event_date']} | Venue: ${e['venue']} | Status: ${e['status']}',
           );
         }
         parts.add(buf.toString());
@@ -208,6 +208,41 @@ class AiChatService {
       }
     } catch (e) {
       debugPrint('Context: lost_found error: $e');
+    }
+
+    try {
+      // 6. Recent notices from user's joined communities
+      final userId = _client.auth.currentUser?.id;
+      if (userId != null) {
+        final joinedComms = await _client
+            .from('community_members')
+            .select('community_id, communities(name)')
+            .eq('user_id', userId)
+            .eq('is_active', true);
+
+        if ((joinedComms as List).isNotEmpty) {
+          final commIds = joinedComms.map((c) => c['community_id'].toString()).toList();
+          final commNotices = await _client
+              .from('community_notices')
+              .select('title, body, community_id, communities(name)')
+              .inFilter('community_id', commIds)
+              .order('created_at', ascending: false)
+              .limit(3);
+
+          if ((commNotices as List).isNotEmpty) {
+            final buf = StringBuffer('RECENT COMMUNITY ANNOUNCEMENTS:\n');
+            for (final cn in commNotices) {
+              final commName = cn['communities']?['name'] ?? 'Community';
+              final body = cn['body']?.toString() ?? '';
+              final shortBody = body.substring(0, body.length.clamp(0, 50)) + (body.length > 50 ? '...' : '');
+              buf.writeln('• [$commName] ${cn['title']} — $shortBody');
+            }
+            parts.add(buf.toString());
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Context: community notices error: $e');
     }
 
     if (parts.isEmpty) {

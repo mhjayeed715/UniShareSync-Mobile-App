@@ -1,4 +1,4 @@
-class EventModel {
+﻿class EventModel {
   const EventModel({
     required this.id,
     required this.title,
@@ -6,7 +6,7 @@ class EventModel {
     required this.date,
     required this.time,
     required this.venue,
-    required this.organizerClub,
+    required this.organizingCommunityName,
     required this.seatCapacity,
     required this.registeredCount,
     required this.status,
@@ -23,7 +23,7 @@ class EventModel {
   final DateTime date;
   final String time;
   final String venue;
-  final String organizerClub;
+  final String organizingCommunityName;
   final int seatCapacity;
   final int registeredCount;
   final EventStatus status;
@@ -45,7 +45,7 @@ class EventModel {
       date: _parseDateTime(map['date']),
       time: map['time']?.toString() ?? '',
       venue: map['venue']?.toString() ?? '',
-      organizerClub: map['organizer_club']?.toString() ?? '',
+      organizingCommunityName: map['organizing_community_name']?.toString() ?? '',
       seatCapacity: _parseInt(map['seat_capacity']),
       registeredCount: _parseInt(map['registered_count']),
       status: EventStatus.fromString(map['status']?.toString() ?? 'upcoming'),
@@ -65,7 +65,7 @@ class EventModel {
       'date': date.toIso8601String(),
       'time': time,
       'venue': venue,
-      'organizer_club': organizerClub,
+      'organizing_community_name': organizingCommunityName,
       'seat_capacity': seatCapacity,
       'registered_count': registeredCount,
       'status': status.value,
@@ -84,7 +84,7 @@ class EventModel {
     DateTime? date,
     String? time,
     String? venue,
-    String? organizerClub,
+    String? organizingCommunityName,
     int? seatCapacity,
     int? registeredCount,
     EventStatus? status,
@@ -101,7 +101,7 @@ class EventModel {
       date: date ?? this.date,
       time: time ?? this.time,
       venue: venue ?? this.venue,
-      organizerClub: organizerClub ?? this.organizerClub,
+      organizingCommunityName: organizingCommunityName ?? this.organizingCommunityName,
       seatCapacity: seatCapacity ?? this.seatCapacity,
       registeredCount: registeredCount ?? this.registeredCount,
       status: status ?? this.status,
@@ -148,3 +148,4 @@ int _parseInt(dynamic value) {
   }
   return 0;
 }
+

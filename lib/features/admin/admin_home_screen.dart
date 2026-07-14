@@ -8,6 +8,7 @@ import 'package:unisharesync_mobile_app/features/auth/login_screen.dart';
 import 'package:unisharesync_mobile_app/features/notice_board/admin_notice_board_screen.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_projects_screen.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_events_screen.dart';
+import 'package:unisharesync_mobile_app/features/admin/admin_communities_screen.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_class_scheduler_screen.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_user_management_screen.dart';
 import 'package:unisharesync_mobile_app/features/feedback/feedback_screen.dart';
@@ -15,6 +16,7 @@ import 'package:unisharesync_mobile_app/features/lost_found/lost_found_screen.da
 import 'package:unisharesync_mobile_app/features/profile/profile_management_screen.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_analytics_screen.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_resources_screen.dart';
+import 'package:unisharesync_mobile_app/features/admin/admin_campus_share_screen.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_settings_screen.dart';
 import 'package:unisharesync_mobile_app/features/ai_chat/ai_chat_screen.dart';
 import 'package:unisharesync_mobile_app/features/bus_tracker/bus_tracker_screen.dart';
@@ -127,11 +129,18 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       color: _AdminPalette.projectsPurple,
     ),
     _AdminPanelOption(
-      id: 'events_clubs',
-      title: 'Events & Clubs',
-      subtitle: 'Manage campus events and clubs.',
+      id: 'events',
+      title: 'Events & Seminars',
+      subtitle: 'Manage campus events & seminars.',
       icon: Icons.celebration_rounded,
       color: _AdminPalette.eventsEmerald,
+    ),
+    _AdminPanelOption(
+      id: 'communities',
+      title: 'Communities',
+      subtitle: 'Manage campus communities.',
+      icon: Icons.groups_rounded,
+      color: _AdminPalette.projectsPurple,
     ),
     _AdminPanelOption(
       id: 'scheduler',
@@ -146,6 +155,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       subtitle: 'Handle item reports.',
       icon: Icons.search_rounded,
       color: _AdminPalette.lostFoundSoftRed,
+    ),
+    _AdminPanelOption(
+      id: 'campus_share',
+      title: 'Campus Share',
+      subtitle: 'Moderate listings and disputes.',
+      icon: Icons.swap_horizontal_circle_rounded,
+      color: _AdminPalette.projectsPurple,
     ),
     _AdminPanelOption(
       id: 'feedback',
@@ -311,9 +327,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           MaterialPageRoute(builder: (_) => const AdminProjectsScreen()),
         );
         break;
-      case 'events_clubs':
+      case 'events':
         await Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const AdminEventsScreen()),
+        );
+        break;
+      case 'communities':
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AdminCommunitiesScreen()),
         );
         break;
       case 'scheduler':
@@ -324,6 +345,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       case 'lost_found':
         await Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const LostFoundScreen()),
+        );
+        break;
+      case 'campus_share':
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AdminCampusShareScreen()),
         );
         break;
       case 'feedback':
@@ -735,3 +761,4 @@ class _AdminOptionCardState extends State<_AdminOptionCard> {
     );
   }
 }
+
