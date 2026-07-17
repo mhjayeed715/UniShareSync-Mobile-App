@@ -75,8 +75,44 @@ class ResourceService {
       final rows = (response as List<dynamic>)
           .map((row) => Map<String, dynamic>.from(row as Map))
           .toList(growable: false);
-      await _cache.saveJsonList(cacheKey, rows);
-      return rows
+
+      final uploaderIds = rows
+          .map((row) => (row['uploader_id'] ?? '').toString())
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList();
+
+      final Map<String, Map<String, dynamic>> profileMap = {};
+      if (uploaderIds.isNotEmpty) {
+        try {
+          final profilesResponse = await _client
+              .from('profiles')
+              .select('id, full_name, avatar_url, role')
+              .inFilter('id', uploaderIds);
+          for (final row in profilesResponse as List<dynamic>) {
+            final mapped = Map<String, dynamic>.from(row);
+            final id = mapped['id'] as String;
+            profileMap[id] = mapped;
+          }
+        } catch (e) {
+          print('DEBUG: Error fetching profiles for resources: $e');
+        }
+      }
+
+      final enrichedRows = rows.map((row) {
+        final uploaderId = (row['uploader_id'] ?? '').toString();
+        final profile = profileMap[uploaderId];
+        final enrichedRow = Map<String, dynamic>.from(row);
+        if (profile != null) {
+          enrichedRow['uploader_name'] = profile['full_name'];
+          enrichedRow['uploader_avatar_url'] = profile['avatar_url'];
+          enrichedRow['uploader_role'] = profile['role'];
+        }
+        return enrichedRow;
+      }).toList();
+
+      await _cache.saveJsonList(cacheKey, enrichedRows);
+      return enrichedRows
           .map((row) => ResourceItem.fromSearchMap(row))
           .toList(growable: false);
     } catch (_) {
@@ -143,6 +179,18 @@ class ResourceService {
           'semester_no': semesterNo.toString(),
         },
       );
+      // Trigger RAG embedding for auto-approved resources (faculty/admin uploads)
+      await _triggerEmbedding(
+        resourceId: item.id,
+        driveUrl: driveUrl.trim(),
+        filename: _ensureExtension(
+          (originalFileName ?? '').trim(),
+          fallback: '${title.trim()}.${fileType.value}',
+          ext: fileType.value,
+        ),
+        courseCode: courseCode,
+        semesterNo: semesterNo,
+      );
     } else {
       // Pending approval — notify admins so they can review
       try {
@@ -205,6 +253,31 @@ class ResourceService {
     await _client.from('resources').delete().eq('id', resourceId);
   }
 
+  Future<void> reEmbedResource({required String resourceId}) async {
+    final resource = await _client
+        .from('resources')
+        .select('drive_url, original_file_name, title, course_code, semester_no, file_type')
+        .eq('id', resourceId)
+        .single();
+    final rawName = resource['original_file_name']?.toString().trim() ?? '';
+    final title   = resource['title']?.toString().trim() ?? 'resource';
+    final fileExt = resource['file_type']?.toString().trim() ?? 'pdf';
+    String filename = _ensureExtension(
+      rawName.isNotEmpty ? rawName : title,
+      fallback: '$title.$fileExt',
+      ext: fileExt,
+    );
+    await _triggerEmbedding(
+      resourceId: resourceId,
+      driveUrl: resource['drive_url']?.toString() ?? '',
+      filename: filename,
+      courseCode: resource['course_code']?.toString(),
+      semesterNo: resource['semester_no'] != null
+          ? int.tryParse(resource['semester_no'].toString())
+          : null,
+    );
+  }
+
   Future<void> reviewResource({
     required String resourceId,
     required bool approve,
@@ -214,7 +287,7 @@ class ResourceService {
       // 1. Fetch resource details (uploader_id and title) BEFORE the RPC action
       final resource = await _client
           .from('resources')
-          .select('uploader_id, title, semester_no')
+          .select('uploader_id, title, semester_no, drive_url, original_file_name, course_code, file_type')
           .eq('id', resourceId)
           .single();
       final uploaderId = resource['uploader_id'] as String;
@@ -261,10 +334,45 @@ class ResourceService {
             },
           );
         }
+        // Trigger RAG embedding for approved resource
+        await _triggerEmbedding(
+          resourceId: resourceId,
+          driveUrl: resource['drive_url']?.toString() ?? '',
+          filename: _ensureExtension(
+            resource['original_file_name']?.toString() ?? '',
+            fallback: '$resourceTitle.${resource['file_type'] ?? 'pdf'}',
+            ext: resource['file_type']?.toString() ?? 'pdf',
+          ),
+          courseCode: resource['course_code']?.toString(),
+          semesterNo: semesterNo != null ? int.tryParse(semesterNo.toString()) : null,
+        );
       }
     } catch (e) {
       print('DEBUG: Review resource error: $e');
       rethrow;
+    }
+  }
+
+  Future<void> _triggerEmbedding({
+    required String resourceId,
+    required String driveUrl,
+    required String filename,
+    String? courseCode,
+    int? semesterNo,
+  }) async {
+    try {
+      await _client.functions.invoke(
+        'embed-resource',
+        body: {
+          'resource_id': resourceId,
+          'drive_url': driveUrl.replaceAll(RegExp(r'[^\x20-\x7E]'), '').trim(),
+          'filename': filename,
+          if (courseCode != null) 'course_code': courseCode,
+          if (semesterNo != null) 'semester': semesterNo,
+        },
+      );
+    } catch (e) {
+      print('DEBUG: Embedding trigger failed (non-fatal): $e');
     }
   }
 
@@ -331,6 +439,21 @@ class ResourceService {
     } catch (_) {
       return _UploaderInfo(name: 'Unknown Uploader', avatarUrl: null);
     }
+  }
+
+  String _ensureExtension(String filename, {required String fallback, String ext = 'pdf'}) {
+    final name = _sanitizeFilename(filename.trim());
+    if (name.isEmpty) return _sanitizeFilename(fallback);
+    if (name.contains('.')) return name;
+    return '$name.$ext';
+  }
+
+  String _sanitizeFilename(String name) {
+    // Strip non-ASCII and characters invalid in filenames/JSON
+    return name
+        .replaceAll(RegExp(r'[^\x20-\x7E]'), '') // remove non-ASCII
+        .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_') // replace invalid filename chars
+        .trim();
   }
 
   String? _nullIfBlank(String? value) {

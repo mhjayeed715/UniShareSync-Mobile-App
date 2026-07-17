@@ -3,26 +3,138 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:unisharesync_mobile_app/core/widgets/glassmorphic_widgets.dart';
 import 'package:unisharesync_mobile_app/data/models/resource_item.dart';
 import 'package:unisharesync_mobile_app/data/models/user_role.dart';
 import 'package:unisharesync_mobile_app/services/resource_service.dart';
+import 'package:unisharesync_mobile_app/features/ai_chat/ai_chat_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-class ResourcesTabView extends StatefulWidget {
+// Real-time Riverpod state management for resources
+class ResourcesState {
+  final List<ResourceItem> resources;
+  final bool isLoading;
+  final String? errorMessage;
+  final List<CourseOption> courseOptions;
+
+  ResourcesState({
+    required this.resources,
+    required this.isLoading,
+    this.errorMessage,
+    required this.courseOptions,
+  });
+
+  ResourcesState copyWith({
+    List<ResourceItem>? resources,
+    bool? isLoading,
+    String? errorMessage,
+    List<CourseOption>? courseOptions,
+  }) {
+    return ResourcesState(
+      resources: resources ?? this.resources,
+      isLoading: isLoading ?? this.isLoading,
+      errorMessage: errorMessage,
+      courseOptions: courseOptions ?? this.courseOptions,
+    );
+  }
+}
+
+class ResourcesNotifier extends StateNotifier<ResourcesState> {
+  ResourcesNotifier()
+      : super(ResourcesState(
+          resources: [],
+          isLoading: true,
+          courseOptions: [],
+        )) {
+    _initRealtimeSubscription();
+  }
+
+  final ResourceService _resourceService = ResourceService();
+  RealtimeChannel? _channel;
+
+  void _initRealtimeSubscription() {
+    _channel = Supabase.instance.client
+        .channel('public:resources')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'resources',
+          callback: (payload) {
+            // Trigger background reload on DB changes
+            refreshResources();
+          },
+        )
+        .subscribe();
+  }
+
+  Future<void> bootstrap() async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final options = await _resourceService.fetchCourseOptions();
+      state = state.copyWith(courseOptions: options);
+      await refreshResources();
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+    }
+  }
+
+  Future<void> refreshResources({
+    String? query,
+    int? semesterNo,
+    String? courseCode,
+    ResourceFileType? fileType,
+    bool showLoader = false,
+  }) async {
+    if (showLoader) {
+      state = state.copyWith(isLoading: true, errorMessage: null);
+    }
+    try {
+      final items = await _resourceService.searchResources(
+        query: query,
+        semesterNo: semesterNo,
+        courseCode: courseCode,
+        fileType: fileType,
+        limit: 120,
+      );
+      state = state.copyWith(resources: items, isLoading: false);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_channel != null) {
+      Supabase.instance.client.removeChannel(_channel!);
+    }
+    super.dispose();
+  }
+}
+
+final resourcesNotifierProvider =
+    StateNotifierProvider<ResourcesNotifier, ResourcesState>((ref) {
+  return ResourcesNotifier();
+});
+
+class ResourcesTabView extends ConsumerStatefulWidget {
   const ResourcesTabView({
     super.key,
     required this.currentRole,
     required this.isLocalAdmin,
     this.refreshTick = 0,
+    this.showHeader = true,
   });
 
   final UserRole currentRole;
   final bool isLocalAdmin;
   final int refreshTick;
+  final bool showHeader;
 
   @override
-  State<ResourcesTabView> createState() => _ResourcesTabViewState();
+  ConsumerState<ResourcesTabView> createState() => _ResourcesTabViewState();
 }
 
 class ResourcesStandaloneScreen extends StatelessWidget {
@@ -43,6 +155,13 @@ class ResourcesStandaloneScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
+        centerTitle: false,
+        leading: Navigator.of(context).canPop()
+            ? IconButton(
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
+              )
+            : null,
         title: const Text(
           'Resources',
           style: TextStyle(
@@ -71,6 +190,7 @@ class ResourcesStandaloneScreen extends StatelessWidget {
               child: ResourcesTabView(
                 currentRole: currentRole,
                 isLocalAdmin: isLocalAdmin,
+                showHeader: false,
               ),
             ),
           ),
@@ -80,16 +200,11 @@ class ResourcesStandaloneScreen extends StatelessWidget {
   }
 }
 
-class _ResourcesTabViewState extends State<ResourcesTabView> {
+class _ResourcesTabViewState extends ConsumerState<ResourcesTabView> {
   final ResourceService _resourceService = ResourceService();
   final TextEditingController _searchController = TextEditingController();
 
   Timer? _searchDebounce;
-  bool _isLoading = true;
-  String? _errorMessage;
-
-  List<CourseOption> _courseOptions = const <CourseOption>[];
-  List<ResourceItem> _resources = const <ResourceItem>[];
 
   int? _selectedSemester;
   String? _selectedCourseCode;
@@ -99,16 +214,18 @@ class _ResourcesTabViewState extends State<ResourcesTabView> {
   bool get _isAdminView => widget.currentRole == UserRole.admin;
 
   int get _pendingReviewCount {
-    return _resources
+    final resources = ref.watch(resourcesNotifierProvider).resources;
+    return resources
         .where((item) => item.approvalStatus == ResourceApprovalStatus.pending)
         .length;
   }
 
   List<ResourceItem> get _visibleResources {
+    final resources = ref.watch(resourcesNotifierProvider).resources;
     if (!_isAdminView) {
       final currentUserId = (_resourceService.currentUserId ?? '').trim();
 
-      return _resources
+      return resources
           .where(
             (item) =>
                 item.approvalStatus == ResourceApprovalStatus.approved ||
@@ -118,20 +235,22 @@ class _ResourcesTabViewState extends State<ResourcesTabView> {
     }
 
     if (_isAdminView && _pendingOnlyForAdmin) {
-      return _resources
+      return resources
           .where(
             (item) => item.approvalStatus == ResourceApprovalStatus.pending,
           )
           .toList(growable: false);
     }
 
-    return _resources;
+    return resources;
   }
 
   @override
   void initState() {
     super.initState();
-    _bootstrap();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(resourcesNotifierProvider.notifier).bootstrap();
+    });
   }
 
   @override
@@ -150,70 +269,17 @@ class _ResourcesTabViewState extends State<ResourcesTabView> {
   }
 
   Future<void> _bootstrap() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final options = await _resourceService.fetchCourseOptions();
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _courseOptions = options;
-      });
-
-      await _refreshResources(showLoader: false);
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _errorMessage = '$error';
-        _isLoading = false;
-      });
-    }
+    ref.read(resourcesNotifierProvider.notifier).bootstrap();
   }
 
   Future<void> _refreshResources({bool showLoader = true}) async {
-    if (showLoader) {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = null;
-      });
-    }
-
-    try {
-      final items = await _resourceService.searchResources(
-        query: _searchController.text,
-        semesterNo: _selectedSemester,
-        courseCode: _selectedCourseCode,
-        fileType: _selectedFileType,
-        limit: 120,
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _resources = items;
-        _isLoading = false;
-      });
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _errorMessage = '$error';
-        _isLoading = false;
-      });
-    }
+    ref.read(resourcesNotifierProvider.notifier).refreshResources(
+      query: _searchController.text,
+      semesterNo: _selectedSemester,
+      courseCode: _selectedCourseCode,
+      fileType: _selectedFileType,
+      showLoader: showLoader,
+    );
   }
 
   void _onSearchChanged(String value) {
@@ -224,7 +290,10 @@ class _ResourcesTabViewState extends State<ResourcesTabView> {
   }
 
   List<int> get _semesterOptions {
-    final values = _courseOptions.map((option) => option.semesterNo).toSet();
+    final courseOptions = ref.watch(resourcesNotifierProvider).courseOptions;
+    final fromCourses = courseOptions.map((option) => option.semesterNo).toSet();
+    // Always include 1-12 so filters work even if courses table is incomplete
+    final values = {...List.generate(12, (i) => i + 1), ...fromCourses};
     final sorted = values.toList()..sort();
     return sorted;
   }
@@ -234,7 +303,8 @@ class _ResourcesTabViewState extends State<ResourcesTabView> {
       return const <CourseOption>[];
     }
 
-    final filtered = _courseOptions
+    final courseOptions = ref.watch(resourcesNotifierProvider).courseOptions;
+    final filtered = courseOptions
         .where((option) => option.semesterNo == _selectedSemester)
         .toList(growable: false);
 
@@ -251,7 +321,7 @@ class _ResourcesTabViewState extends State<ResourcesTabView> {
 
     final uploaded = await showResourceUploadSheet(
       context,
-      preloadedCourses: _courseOptions,
+      preloadedCourses: ref.read(resourcesNotifierProvider).courseOptions,
     );
 
     if (!mounted || uploaded == null) {
@@ -295,7 +365,7 @@ class _ResourcesTabViewState extends State<ResourcesTabView> {
   Future<void> _openEditSheet(ResourceItem item) async {
     final updated = await showResourceUploadSheet(
       context,
-      preloadedCourses: _courseOptions,
+      preloadedCourses: ref.read(resourcesNotifierProvider).courseOptions,
       existingResource: item,
     );
 
@@ -444,11 +514,8 @@ class _ResourcesTabViewState extends State<ResourcesTabView> {
       return;
     }
 
-    setState(() {
-      _resources = _resources
-          .map((current) => current.id == updated.id ? updated : current)
-          .toList(growable: false);
-    });
+    // Refresh provider
+    _refreshResources(showLoader: false);
   }
 
   @override
@@ -458,30 +525,51 @@ class _ResourcesTabViewState extends State<ResourcesTabView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 8),
-        Row(
-          children: [
-            const Expanded(
-              child: _ResourceTopHeader(
-                title: 'Resources',
-                subtitle: 'Search, filter, preview and upload from database',
-              ),
-            ),
-            const SizedBox(width: 8),
-            FilledButton.icon(
-              onPressed: _openUploadSheet,
-              icon: const Icon(Icons.upload_file_rounded, size: 18),
-              label: const Text('Upload'),
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF4F9EFF),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+        if (widget.showHeader) ...[
+          Row(
+            children: [
+              const Expanded(
+                child: _ResourceTopHeader(
+                  title: 'Resources',
+                  subtitle: 'Search, filter, preview and upload from database',
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
+              const SizedBox(width: 8),
+              FilledButton.icon(
+                onPressed: _openUploadSheet,
+                icon: const Icon(Icons.upload_file_rounded, size: 18),
+                label: const Text('Upload'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF4F9EFF),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ] else ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              FilledButton.icon(
+                onPressed: _openUploadSheet,
+                icon: const Icon(Icons.upload_file_rounded, size: 18),
+                label: const Text('Upload'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF4F9EFF),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
         _SearchField(
           controller: _searchController,
           onChanged: _onSearchChanged,
@@ -538,25 +626,32 @@ class _ResourcesTabViewState extends State<ResourcesTabView> {
   }
 
   Widget _buildBody() {
-    if (_isLoading && _visibleResources.isEmpty) {
+    final resourcesState = ref.watch(resourcesNotifierProvider);
+
+    if (resourcesState.isLoading && _visibleResources.isEmpty) {
       return ListView.separated(
         padding: const EdgeInsets.fromLTRB(0, 2, 0, 118),
-        itemCount: 5,
+        itemCount: 6,
         separatorBuilder: (_, __) => const SizedBox(height: 10),
-        itemBuilder: (_, __) => const _ResourceSkeletonCard(),
+        itemBuilder: (_, __) => const SkeletonListTile(),
       );
     }
 
-    if (_errorMessage != null && _visibleResources.isEmpty) {
-      return _RetryState(
-        title: 'Unable to load resources',
-        subtitle: _errorMessage!,
+    if (resourcesState.errorMessage != null && _visibleResources.isEmpty) {
+      return ErrorStateWidget(
+        errorMessage: resourcesState.errorMessage!,
         onRetry: _bootstrap,
       );
     }
 
     if (_visibleResources.isEmpty) {
-      return _EmptyResourceState(onUpload: _openUploadSheet);
+      return EmptyStateWidget(
+        title: 'No Resources',
+        description: 'No resources match your filters or query.',
+        icon: Icons.menu_book_rounded,
+        actionText: 'Upload Resource',
+        onAction: _openUploadSheet,
+      );
     }
 
     return RefreshIndicator(
@@ -576,10 +671,40 @@ class _ResourcesTabViewState extends State<ResourcesTabView> {
             onDelete: () => _deleteResource(item),
             onApprove: () => _approveResource(item),
             onReject: () => _rejectResource(item),
+            onAskAi: () => _openAiForResource(item),
+            onReEmbed: _isAdminView &&
+                    item.approvalStatus == ResourceApprovalStatus.approved &&
+                    item.fileType != ResourceFileType.image
+                ? () => _reEmbedResource(item)
+                : null,
           );
         },
       ),
     );
+  }
+
+  void _openAiForResource(ResourceItem item) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AiChatScreen(
+          initialPrompt:
+              'Tell me about the resource "${item.title}" for ${item.courseCode} (${item.courseTitle}). What topics does it cover?',
+          resourceCourseCode: item.courseCode,
+          resourceSemester: item.semesterNo,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _reEmbedResource(ResourceItem item) async {
+    try {
+      await _resourceService.reEmbedResource(resourceId: item.id);
+      if (!mounted) return;
+      _showMessage('Re-indexing started. AI will be able to answer from this resource shortly.');
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage('Re-index failed: $e');
+    }
   }
 }
 
@@ -885,6 +1010,8 @@ class _ResourceListCard extends StatelessWidget {
     required this.onDelete,
     required this.onApprove,
     required this.onReject,
+    required this.onAskAi,
+    this.onReEmbed,
   });
 
   final ResourceItem item;
@@ -895,6 +1022,8 @@ class _ResourceListCard extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onApprove;
   final VoidCallback onReject;
+  final VoidCallback onAskAi;
+  final VoidCallback? onReEmbed;
 
   @override
   Widget build(BuildContext context) {
@@ -958,6 +1087,75 @@ class _ResourceListCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     _UploaderIdentityRow(item: item),
+                    // AI ask button — only for approved text-based resources
+                    if (item.approvalStatus == ResourceApprovalStatus.approved &&
+                        item.fileType != ResourceFileType.image) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          GestureDetector(
+                            onTap: onAskAi,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF5B21B6), Color(0xFF7C3AED)],
+                                ),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Icon(Icons.smart_toy_rounded,
+                                      size: 13, color: Colors.white),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Ask AI',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (onReEmbed != null) ...[
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: onReEmbed,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEFF6FF),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: const Color(0xFFBFDBFE)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    Icon(Icons.refresh_rounded,
+                                        size: 13, color: Color(0xFF1D4ED8)),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Re-index AI',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF1D4ED8),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 7),
                     Row(
                       children: [
@@ -1448,7 +1646,9 @@ class _ResourceUploadSheetState extends State<_ResourceUploadSheet> {
   }
 
   List<int> get _semesterOptions {
-    final set = _courses.map((course) => course.semesterNo).toSet().toList();
+    final fromCourses = _courses.map((course) => course.semesterNo).toSet();
+    // Always include 1-12; courses data may not cover all semesters yet
+    final set = {...List.generate(12, (i) => i + 1), ...fromCourses}.toList();
     set.sort();
     return set;
   }
@@ -1740,7 +1940,7 @@ class _ResourceUploadSheetState extends State<_ResourceUploadSheet> {
                           border: Border.all(color: const Color(0xFFC8DEFF)),
                         ),
                         child: const Text(
-                          'How to share:\n1. Upload your file to Google Drive\n2. Share -> Anyone with the link\n3. Paste that link above',
+                          'How to share:\n1. Upload your file to Google Drive\n2. Share -> Anyone with the link\n3. Paste that link above\n⚠️ Make sure the link opens YOUR actual file, not a demo or placeholder.',
                           style: TextStyle(
                             color: Color(0xFF1D4ED8),
                             fontWeight: FontWeight.w600,
@@ -2130,39 +2330,73 @@ class _ResourceDetailScreenState extends State<ResourceDetailScreen> {
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _copyLink,
-                  icon: const Icon(Icons.link_rounded),
-                  label: const Text('Copy Link'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 2,
-                child: FilledButton.icon(
-                  onPressed:
-                      _isRecordingDownload ? null : _recordDownloadAndOpen,
-                  icon: _isRecordingDownload
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+              if (_resource.approvalStatus == ResourceApprovalStatus.approved &&
+                  _resource.fileType != ResourceFileType.image)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => AiChatScreen(
+                            initialPrompt:
+                                'Tell me about the resource "${_resource.title}" for ${_resource.courseCode} (${_resource.courseTitle}). What topics does it cover?',
+                            resourceCourseCode: _resource.courseCode,
+                            resourceSemester: _resource.semesterNo,
                           ),
-                        )
-                      : const Icon(Icons.download_rounded),
-                  label: Text(
-                    _isRecordingDownload ? 'Processing...' : 'Download',
-                  ),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF4F9EFF),
-                    foregroundColor: Colors.white,
+                        ),
+                      ),
+                      icon: const Icon(Icons.smart_toy_rounded, size: 16),
+                      label: const Text('Ask AI about this resource'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF7C3AED),
+                        side: const BorderSide(color: Color(0xFF7C3AED)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _copyLink,
+                      icon: const Icon(Icons.link_rounded),
+                      label: const Text('Copy Link'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton.icon(
+                      onPressed:
+                          _isRecordingDownload ? null : _recordDownloadAndOpen,
+                      icon: _isRecordingDownload
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.download_rounded),
+                      label: Text(
+                        _isRecordingDownload ? 'Processing...' : 'Download',
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF4F9EFF),
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
