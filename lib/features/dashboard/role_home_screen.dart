@@ -1,5 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
+
+import 'package:flutter/foundation.dart';
+import 'package:native_glass_navbar/native_glass_navbar.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,6 +24,7 @@ import 'package:unisharesync_mobile_app/features/scheduler/class_scheduler_scree
 import 'package:unisharesync_mobile_app/features/events/presentation/screens/events_browse_screen.dart';
 import 'package:unisharesync_mobile_app/features/communities/presentation/screens/communities_browse_screen.dart';
 import 'package:unisharesync_mobile_app/features/lost_found/lost_found_screen.dart';
+import 'package:unisharesync_mobile_app/features/alumni/presentation/screens/alumni_browse_screen.dart';
 import 'package:unisharesync_mobile_app/features/feedback/feedback_screen.dart';
 import 'package:unisharesync_mobile_app/features/ai_chat/ai_chat_screen.dart';
 import 'package:unisharesync_mobile_app/features/bus_tracker/bus_tracker_screen.dart';
@@ -42,6 +49,8 @@ enum _MenuDestination {
   aiCampusAssistant,
   busTracker,
   campusShare,
+  alumniConnect,
+  signOut,
 }
 
 class _DashboardPalette {
@@ -62,6 +71,7 @@ class _DashboardPalette {
   static const Color notificationSky = Color(0xFF0EA5E9);
   static const Color aiAssistantViolet = Color(0xFF7C3AED);
   static const Color campusShareOrange = Color(0xFFF97316);
+  static const Color alumniBlue = Color(0xFF2563EB);
 }
 
 class RoleHomeScreen extends StatefulWidget {
@@ -94,6 +104,8 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
   int _resourcesRefreshTick = 0;
 
   DateTime _now = DateTime.now();
+  bool _isOnline = true;
+  StreamSubscription? _connectivitySub;
   Timer? _clockTicker;
 
   late final Stream<List<DashboardFeedItem>> _resourceStream;
@@ -119,13 +131,35 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
 
     _startClockTicker();
     _resolveSession();
+    _watchConnectivity();
   }
 
   @override
   void dispose() {
     _clockTicker?.cancel();
     _cancelNotificationStreams();
+    _connectivitySub?.cancel();
     super.dispose();
+  }
+
+  void _watchConnectivity() {
+    Connectivity().checkConnectivity().then((results) {
+      final online = results.any((r) => r != ConnectivityResult.none);
+      if (mounted && _isOnline != online) {
+        setState(() {
+          _isOnline = online;
+        });
+      }
+    });
+
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
+      final online = results.any((r) => r != ConnectivityResult.none);
+      if (mounted && _isOnline != online) {
+        setState(() {
+          _isOnline = online;
+        });
+      }
+    });
   }
 
   void _startClockTicker() {
@@ -547,18 +581,23 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
 
     switch (destination) {
       case _MenuDestination.profile:
-        setState(() {
-          _activeTab = _DashboardTab.profile;
-        });
+        _openProfileEditor();
         break;
       case _MenuDestination.settings:
-        // Settings row navigates inline via profile tab — no separate screen needed
-        setState(() { _activeTab = _DashboardTab.profile; });
+        _openProfileEditor();
+        break;
+      case _MenuDestination.signOut:
+        _signOut();
         break;
       case _MenuDestination.resources:
-        setState(() {
-          _activeTab = _DashboardTab.resources;
-        });
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ResourcesStandaloneScreen(
+              currentRole: _role,
+              isLocalAdmin: _isLocalAdmin,
+            ),
+          ),
+        );
         break;
       case _MenuDestination.noticeBoard:
         await Navigator.of(context).push(
@@ -628,6 +667,13 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
         await Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => const CampusShareHomeScreen(),
+          ),
+        );
+        break;
+      case _MenuDestination.alumniConnect:
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const AlumniBrowseScreen(),
           ),
         );
         break;
@@ -1120,6 +1166,18 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
                   );
                 },
               ),
+              _QuickAccessTile(
+                icon: Icons.school_rounded,
+                label: 'AlumniConnect',
+                color: _DashboardPalette.alumniBlue,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const AlumniBrowseScreen(),
+                    ),
+                  );
+                },
+              ),
             ],
           ),
         ],
@@ -1250,23 +1308,104 @@ class _RoleHomeScreenState extends State<RoleHomeScreen> {
                       child: _buildCurrentTab(),
                     ),
                   ),
+                  if (!_isOnline)
+                    Positioned(
+                      top: MediaQuery.of(context).padding.top + 10,
+                      left: 16,
+                      right: 16,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEE2E2).withOpacity(0.9),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFFCA5A5).withOpacity(0.5)),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.wifi_off_rounded, color: Color(0xFFB91C1C), size: 20),
+                                SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'No Connection. Working offline.',
+                                    style: TextStyle(
+                                      color: Color(0xFFB91C1C),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
         bottomNavigationBar: _isLoading
             ? null
-            : Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-                child: _FloatingGlassBottomNav(
-                  activeTab: _activeTab,
-                  onTabSelected: (_DashboardTab tab) {
-                    setState(() {
-                      _activeTab = tab;
-                    });
-                  },
-                  onCenterPressed: _openQuickActionSheet,
-                  onMenuPressed: _openHamburgerMenu,
-                ),
-              ),
+            : (!kIsWeb && Platform.isIOS)
+                ? NativeGlassNavBar(
+                    currentIndex: _currentIndex,
+                    onTap: _onBottomNavTapped,
+                    actionButton: TabBarActionButton(
+                      symbol: 'sparkles',
+                      onTap: _openQuickActionSheet,
+                    ),
+                    tabs: const [
+                      NativeGlassNavBarItem(label: 'Home', symbol: 'house'),
+                      NativeGlassNavBarItem(label: 'Resources', symbol: 'book'),
+                      NativeGlassNavBarItem(label: 'Routine', symbol: 'calendar'),
+                      NativeGlassNavBarItem(label: 'Menu', symbol: 'line.3.horizontal'),
+                    ],
+                    fallback: _buildFallbackBottomNav(),
+                  )
+                : _buildFallbackBottomNav(),
+      ),
+    );
+  }
+
+  int get _currentIndex {
+    switch (_activeTab) {
+      case _DashboardTab.home:
+        return 0;
+      case _DashboardTab.resources:
+        return 1;
+      case _DashboardTab.routine:
+        return 2;
+      case _DashboardTab.profile:
+        return 0;
+    }
+  }
+
+  void _onBottomNavTapped(int index) {
+    if (index == 3) {
+      _openHamburgerMenu();
+      return;
+    }
+    setState(() {
+      if (index == 0) _activeTab = _DashboardTab.home;
+      if (index == 1) _activeTab = _DashboardTab.resources;
+      if (index == 2) _activeTab = _DashboardTab.routine;
+    });
+  }
+
+  Widget _buildFallbackBottomNav() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+      child: _FloatingGlassBottomNav(
+        activeTab: _activeTab,
+        onTabSelected: (_DashboardTab tab) {
+          setState(() {
+            _activeTab = tab;
+          });
+        },
+        onCenterPressed: _openQuickActionSheet,
+        onMenuPressed: _openHamburgerMenu,
       ),
     );
   }
@@ -2141,6 +2280,12 @@ class _HamburgerMenuScreen extends StatelessWidget {
                       label: 'CampusShare',
                       onTap: () => _go(context, _MenuDestination.campusShare),
                     ),
+                    _SettingsRow(
+                      icon: Icons.school_rounded,
+                      iconColor: _DashboardPalette.alumniBlue,
+                      label: 'AlumniConnect',
+                      onTap: () => _go(context, _MenuDestination.alumniConnect),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 22),
@@ -2166,8 +2311,15 @@ class _HamburgerMenuScreen extends StatelessWidget {
                     _SettingsRow(
                       icon: Icons.settings_outlined,
                       iconColor: _DashboardPalette.settingsSlate,
-                      label: 'Settings',
-                      onTap: () => _go(context, _MenuDestination.settings),
+                      label: 'Profile Settings',
+                      onTap: () => _go(context, _MenuDestination.profile),
+                    ),
+                    _SettingsRow(
+                      icon: Icons.logout_rounded,
+                      iconColor: const Color(0xFFDC2626),
+                      label: 'Sign Out',
+                      isDestructive: true,
+                      onTap: () => _go(context, _MenuDestination.signOut),
                     ),
                   ],
                 ),
@@ -2250,14 +2402,16 @@ class _SettingsRow extends StatelessWidget {
     required this.iconColor,
     required this.label,
     required this.onTap,
+    this.trailing,
+    this.isDestructive = false,
   });
 
   final IconData icon;
   final Color iconColor;
   final String label;
   final VoidCallback? onTap;
-  final Widget? trailing = null;
-  final bool isDestructive = false;
+  final Widget? trailing;
+  final bool isDestructive;
 
   @override
   Widget build(BuildContext context) {
@@ -2616,31 +2770,57 @@ class _FloatingGlassBottomNav extends StatelessWidget {
                   height: 68,
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.7),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.white.withOpacity(0.12),
+                        const Color(0xFFE0F2FE).withOpacity(0.22),
+                      ],
+                    ),
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: Colors.white.withOpacity(0.95)),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.42),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF38BDF8).withOpacity(0.12),
+                        blurRadius: 16,
+                        offset: const Offset(0, 8),
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 20,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       _BottomNavItem(
                         icon: const Icon(Icons.home_rounded),
+                        label: 'Home',
                         isActive: activeTab == _DashboardTab.home,
                         onTap: () => onTabSelected(_DashboardTab.home),
                       ),
                       _BottomNavItem(
                         icon: const Icon(Icons.import_contacts_rounded),
+                        label: 'Resources',
                         isActive: activeTab == _DashboardTab.resources,
                         onTap: () => onTabSelected(_DashboardTab.resources),
                       ),
                       const SizedBox(width: 56),
                       _BottomNavItem(
                         icon: const Icon(Icons.calendar_view_week_rounded),
+                        label: 'Routine',
                         isActive: activeTab == _DashboardTab.routine,
                         onTap: () => onTabSelected(_DashboardTab.routine),
                       ),
                       _BottomNavItem(
                         icon: const Icon(Icons.menu_rounded),
+                        label: 'Menu',
                         isActive: false,
                         onTap: onMenuPressed,
                       ),
@@ -2684,11 +2864,13 @@ class _FloatingGlassBottomNav extends StatelessWidget {
 class _BottomNavItem extends StatelessWidget {
   const _BottomNavItem({
     required this.icon,
+    required this.label,
     required this.isActive,
     required this.onTap,
   });
 
   final Widget icon;
+  final String label;
   final bool isActive;
   final VoidCallback onTap;
 
@@ -2701,23 +2883,22 @@ class _BottomNavItem extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       onTap: onTap,
       child: SizedBox(
-        width: 46,
+        width: 60,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             IconTheme(
-              data: IconThemeData(color: iconColor, size: 25),
+              data: IconThemeData(color: iconColor, size: 22),
               child: icon,
             ),
-            const SizedBox(height: 4),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 170),
-              width: 4,
-              height: 4,
-              decoration: BoxDecoration(
-                color:
-                    isActive ? _DashboardPalette.authBlue : Colors.transparent,
-                shape: BoxShape.circle,
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                color: iconColor,
+                fontSize: 10,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                fontFamily: 'Outfit',
               ),
             ),
           ],

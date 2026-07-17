@@ -18,6 +18,7 @@ import 'package:unisharesync_mobile_app/features/admin/admin_analytics_screen.da
 import 'package:unisharesync_mobile_app/features/admin/admin_resources_screen.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_campus_share_screen.dart';
 import 'package:unisharesync_mobile_app/features/admin/admin_settings_screen.dart';
+import 'package:unisharesync_mobile_app/features/alumni/presentation/screens/alumni_admin_screen.dart';
 import 'package:unisharesync_mobile_app/features/ai_chat/ai_chat_screen.dart';
 import 'package:unisharesync_mobile_app/features/bus_tracker/bus_tracker_screen.dart';
 import 'package:unisharesync_mobile_app/features/notification_center/notification_center_screen.dart';
@@ -97,6 +98,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       icon: Icons.admin_panel_settings_rounded,
       color: _AdminPalette.roleControlCyan,
     ),
+
     _AdminPanelOption(
       id: 'profile',
       title: 'Profile',
@@ -162,6 +164,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       subtitle: 'Moderate listings and disputes.',
       icon: Icons.swap_horizontal_circle_rounded,
       color: _AdminPalette.projectsPurple,
+    ),
+    _AdminPanelOption(
+      id: 'alumni_connect',
+      title: 'Alumni Connect',
+      subtitle: 'Approve submissions and audit logs.',
+      icon: Icons.school_rounded,
+      color: _AdminPalette.authBlue,
     ),
     _AdminPanelOption(
       id: 'feedback',
@@ -312,6 +321,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           MaterialPageRoute(builder: (_) => const AdminUserManagementScreen()),
         );
         break;
+
       case 'resources':
         await Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const AdminResourcesScreen()),
@@ -350,6 +360,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       case 'campus_share':
         await Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const AdminCampusShareScreen()),
+        );
+        break;
+      case 'alumni_connect':
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AlumniAdminScreen()),
         );
         break;
       case 'feedback':
