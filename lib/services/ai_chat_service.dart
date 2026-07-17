@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
+import 'package:uuid/uuid.dart';
 import 'package:unisharesync_mobile_app/features/ai_chat/chat_models.dart';
 import 'package:unisharesync_mobile_app/data/models/profile_model.dart';
 import 'package:unisharesync_mobile_app/data/models/user_role.dart';
@@ -13,6 +14,8 @@ import 'package:unisharesync_mobile_app/data/models/user_role.dart';
 class AiChatService {
   AiChatService({SupabaseClient? client})
       : _client = client ?? Supabase.instance.client;
+
+  final String _sessionId = const Uuid().v4();
 
   final SupabaseClient _client;
 
@@ -245,6 +248,81 @@ class AiChatService {
       debugPrint('Context: community notices error: $e');
     }
 
+    try {
+      final alumni = await _client
+          .from('alumni_profiles')
+          .select('id, full_name, batch_year, current_job_title, current_company, current_location, is_open_to_mentor')
+          .eq('is_verified', true)
+          .eq('is_published', true)
+          .limit(8);
+
+      if ((alumni as List).isNotEmpty) {
+        final buf = StringBuffer('SMUCT ALUMNI NETWORK & MENTORS (Share unisharesync://alumni/detail/{id} for clicks):\n');
+        for (final al in alumni) {
+          final role = al['current_job_title'] ?? 'Alumnus';
+          final company = al['current_company'] ?? 'SMUCT';
+          final loc = al['current_location'] ?? 'Dhaka, Bangladesh';
+          final mentorStatus = al['is_open_to_mentor'] == true ? '[Mentor - Available]' : '';
+          buf.writeln(
+            '• ${al['full_name']} (Batch ${al['batch_year']}) | Role: $role at $company | Location: $loc $mentorStatus | Profile Link: unisharesync://alumni/detail/${al['id']}',
+          );
+        }
+        parts.add(buf.toString());
+      }
+    } catch (e) {
+      debugPrint('Context: alumni error: $e');
+    }
+
+    try {
+      // 7. Campus Share active listings
+      final listings = await _client
+          .from('campus_share_listings')
+          .select('title, description, category, condition')
+          .eq('status', 'available')
+          .eq('admin_approved', true)
+          .eq('is_draft', false)
+          .order('created_at', ascending: false)
+          .limit(4);
+
+      if ((listings as List).isNotEmpty) {
+        final buf = StringBuffer('CAMPUS SHARE — AVAILABLE ITEMS TO BORROW:\n');
+        for (final l in listings) {
+          final desc = l['description']?.toString() ?? '';
+          final shortDesc = desc.substring(0, desc.length.clamp(0, 50)) + (desc.length > 50 ? '...' : '');
+          buf.writeln('• ${l['title']} | Category: ${l['category']} | Condition: ${l['condition']} — $shortDesc');
+        }
+        parts.add(buf.toString());
+      }
+    } catch (e) {
+      debugPrint('Context: campus share error: $e');
+    }
+
+    try {
+      // 8. User's joined communities
+      final userId = _client.auth.currentUser?.id;
+      if (userId != null) {
+        final communities = await _client
+            .from('community_members')
+            .select('communities(name, description, member_count)')
+            .eq('user_id', userId)
+            .eq('is_active', true)
+            .limit(5);
+
+        if ((communities as List).isNotEmpty) {
+          final buf = StringBuffer('YOUR COMMUNITIES / CLUBS:\n');
+          for (final c in communities) {
+            final comm = c['communities'] as Map?;
+            if (comm != null) {
+              buf.writeln('• ${comm['name']} — ${comm['description']?.toString().substring(0, (comm['description']?.toString().length ?? 0).clamp(0, 60)) ?? ''} | Members: ${comm['member_count']}');
+            }
+          }
+          parts.add(buf.toString());
+        }
+      }
+    } catch (e) {
+      debugPrint('Context: communities error: $e');
+    }
+
     if (parts.isEmpty) {
       return 'No live campus data could be fetched at this time.';
     }
@@ -258,7 +336,13 @@ class AiChatService {
 
   /// Sends the user prompt + context to the `ai-chat` Edge Function
   /// and yields a stream of [AiChatEvent] (tokens and suggestions).
-  Stream<AiChatEvent> streamResponse(String prompt, {String? userApiKey, String? userGroupName}) async* {
+  Stream<AiChatEvent> streamResponse(
+    String prompt, {
+    String? userApiKey,
+    String? userGroupName,
+    String? courseCode,
+    int? semester,
+  }) async* {
     final context = await gatherCampusContext(userGroupName: userGroupName);
 
     final url = Uri.parse(
@@ -270,14 +354,17 @@ class AiChatService {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer ${_client.auth.currentSession?.accessToken ?? ''}',
       'apikey': _client.rest.headers['apikey'] ?? '',
-      if (userApiKey != null && userApiKey.isNotEmpty) ...{
-        if (userApiKey.startsWith('gsk_'))
-          'x-user-groq-key': userApiKey
-        else
-          'x-user-gemini-key': userApiKey,
-      }
+      // Legacy: pass key via header for users who haven't migrated to server-stored key
+      if (userApiKey != null && userApiKey.trim().isNotEmpty && userApiKey.startsWith('gsk_'))
+        'x-user-groq-key': userApiKey,
     });
-    request.body = jsonEncode({'prompt': prompt, 'context': context});
+    request.body = jsonEncode({
+      'prompt': prompt,
+      'context': context,
+      'session_id': _sessionId,
+      if (courseCode != null) 'course_code': courseCode,
+      if (semester != null) 'semester': semester,
+    });
 
     final httpClient = http.Client();
 
@@ -323,14 +410,38 @@ class AiChatService {
               yield AiChatEvent.token(parsed['token'] as String);
             }
 
-            if (parsed['done'] == true && parsed.containsKey('suggestions')) {
-              final rawSuggestions = parsed['suggestions'] as List<dynamic>;
+            if (parsed['done'] == true) {
+              final rawSuggestions = (parsed['suggestions'] as List<dynamic>?) ?? [];
               final chips = rawSuggestions
                   .map((s) => SuggestionChip.fromMap(
                         Map<String, dynamic>.from(s as Map),
                       ))
                   .toList(growable: false);
-              yield AiChatEvent.done(chips);
+
+              // Parse new metadata fields
+              AiCitation? citation;
+              final rawCitation = parsed['citation'];
+              if (rawCitation is Map) {
+                citation = AiCitation.fromMap(Map<String, dynamic>.from(rawCitation));
+              }
+
+              yield AiChatEvent.done(
+                chips,
+                citation: citation,
+                usedRag: parsed['used_rag'] as bool? ?? false,
+                fromCache: parsed['from_cache'] as bool? ?? false,
+                questionsUsed: parsed['questions_used'] as int?,
+                questionsLimit: parsed['questions_limit'] as int?,
+                usingOwnKey: parsed['using_own_key'] as bool? ?? false,
+              );
+            }
+
+            // Handle quota exceeded error returned inside SSE stream
+            if (parsed.containsKey('error') && parsed['error'] == 'quota_exceeded') {
+              yield AiChatEvent.quotaExceeded(
+                questionsUsed: parsed['questions_used'] as int? ?? 5,
+                questionsLimit: parsed['questions_limit'] as int? ?? 5,
+              );
             }
           } catch (_) {
             // Skip malformed JSON
@@ -347,14 +458,27 @@ class AiChatService {
             if (parsed.containsKey('token')) {
               yield AiChatEvent.token(parsed['token'] as String);
             }
-            if (parsed['done'] == true && parsed.containsKey('suggestions')) {
-              final rawSuggestions = parsed['suggestions'] as List<dynamic>;
+            if (parsed['done'] == true) {
+              final rawSuggestions = (parsed['suggestions'] as List<dynamic>?) ?? [];
               final chips = rawSuggestions
                   .map((s) => SuggestionChip.fromMap(
                         Map<String, dynamic>.from(s as Map),
                       ))
                   .toList(growable: false);
-              yield AiChatEvent.done(chips);
+              AiCitation? citation;
+              final rawCitation = parsed['citation'];
+              if (rawCitation is Map) {
+                citation = AiCitation.fromMap(Map<String, dynamic>.from(rawCitation));
+              }
+              yield AiChatEvent.done(
+                chips,
+                citation: citation,
+                usedRag: parsed['used_rag'] as bool? ?? false,
+                fromCache: parsed['from_cache'] as bool? ?? false,
+                questionsUsed: parsed['questions_used'] as int?,
+                questionsLimit: parsed['questions_limit'] as int?,
+                usingOwnKey: parsed['using_own_key'] as bool? ?? false,
+              );
             }
           } catch (_) {}
         }
@@ -398,8 +522,20 @@ sealed class AiChatEvent {
   const AiChatEvent();
 
   factory AiChatEvent.token(String text) = AiTokenEvent;
-  factory AiChatEvent.done(List<SuggestionChip> suggestions) = AiDoneEvent;
+  factory AiChatEvent.done(
+    List<SuggestionChip> suggestions, {
+    AiCitation? citation,
+    bool usedRag,
+    bool fromCache,
+    int? questionsUsed,
+    int? questionsLimit,
+    bool usingOwnKey,
+  }) = AiDoneEvent;
   factory AiChatEvent.error(String message) = AiErrorEvent;
+  factory AiChatEvent.quotaExceeded({
+    required int questionsUsed,
+    required int questionsLimit,
+  }) = AiQuotaExceededEvent;
 }
 
 class AiTokenEvent extends AiChatEvent {
@@ -408,11 +544,34 @@ class AiTokenEvent extends AiChatEvent {
 }
 
 class AiDoneEvent extends AiChatEvent {
-  const AiDoneEvent(this.suggestions);
+  const AiDoneEvent(
+    this.suggestions, {
+    this.citation,
+    this.usedRag = false,
+    this.fromCache = false,
+    this.questionsUsed,
+    this.questionsLimit,
+    this.usingOwnKey = false,
+  });
   final List<SuggestionChip> suggestions;
+  final AiCitation? citation;
+  final bool usedRag;
+  final bool fromCache;
+  final int? questionsUsed;
+  final int? questionsLimit;
+  final bool usingOwnKey;
 }
 
 class AiErrorEvent extends AiChatEvent {
   const AiErrorEvent(this.message);
   final String message;
+}
+
+class AiQuotaExceededEvent extends AiChatEvent {
+  const AiQuotaExceededEvent({
+    required this.questionsUsed,
+    required this.questionsLimit,
+  });
+  final int questionsUsed;
+  final int questionsLimit;
 }
