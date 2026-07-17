@@ -78,6 +78,7 @@ class UniShareSyncApp extends StatelessWidget {
       // Smooth physics that feel natural on 90/120 Hz displays
       scrollBehavior: const _SmoothScrollBehavior(),
       theme: ThemeData(
+        fontFamily: 'Outfit',
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF4F9EFF)),
         useMaterial3: true,
         // Disable the ink splash ripple delay so taps feel instant
