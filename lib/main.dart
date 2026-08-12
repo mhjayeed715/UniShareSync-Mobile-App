@@ -83,12 +83,6 @@ class UniShareSyncApp extends StatelessWidget {
         useMaterial3: true,
         // Disable the ink splash ripple delay so taps feel instant
         splashFactory: InkRipple.splashFactory,
-        pageTransitionsTheme: PageTransitionsTheme(
-          builders: {
-            TargetPlatform.android: const FadeUpwardsPageTransitionsBuilder(),
-            TargetPlatform.iOS: const CupertinoPageTransitionsBuilder(),
-          },
-        ),
       ),
       home: const SplashScreen(),
     );
