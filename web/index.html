@@ -40,6 +40,15 @@
 <body>
   <script src="bundle.js"></script>
   <script src="assets/passkeys/bundle.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/firebase-messaging-sw.js').then(function(reg) {
+        console.log('[ServiceWorker] Firebase Messaging Service Worker registered successfully', reg);
+      }).catch(function(err) {
+        console.log('[ServiceWorker] Service Worker registration failed: ', err);
+      });
+    }
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

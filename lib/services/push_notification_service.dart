@@ -85,9 +85,42 @@ class PushNotificationService {
     }
     _initialised = true;
 
-    if (kIsWeb) return;
+    if (kIsWeb) {
+      try {
+        final settings = await _messaging.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+        debugPrint('[FCM Web] Notification permission: ${settings.authorizationStatus}');
 
-    if (Platform.isAndroid) {
+        final targetUid = userId ?? Supabase.instance.client.auth.currentUser?.id;
+        if (targetUid != null) {
+          final token = await _messaging.getToken();
+          if (token != null) await _persistToken(targetUid, token);
+        }
+
+        _messaging.onTokenRefresh.listen((token) async {
+          final uid = Supabase.instance.client.auth.currentUser?.id;
+          if (uid != null) await _persistToken(uid, token);
+        });
+
+        Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
+          final uid = data.session?.user.id;
+          if (uid != null) {
+            final token = await _messaging.getToken();
+            if (token != null) await _persistToken(uid, token);
+          }
+        });
+
+        FirebaseMessaging.onMessage.listen(_handleForeground);
+      } catch (e) {
+        debugPrint('[FCM Web] init error: $e');
+      }
+      return;
+    }
+
+    if (!kIsWeb && Platform.isAndroid) {
       final status = await Permission.notification.status;
       if (!status.isGranted) await Permission.notification.request();
     }
@@ -184,6 +217,11 @@ class PushNotificationService {
     final body =
         message.notification?.body ?? message.data['body']?.toString() ?? '';
     if (body.isEmpty) return;
+
+    if (kIsWeb) {
+      debugPrint('[FCM Web] Foreground message: $title - $body');
+      return;
+    }
 
     _localNotifications.show(
       message.hashCode,
