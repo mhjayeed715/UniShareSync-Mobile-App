@@ -119,10 +119,6 @@ class _SignInScreenState extends State<SignInScreen> {
         password: _passwordController.text,
       );
 
-      if (!mounted) {
-        return;
-      }
-
       final userId = session.user?.id;
       if (userId != null) {
         PushNotificationService.instance.init(userId: userId).catchError((_) {});
@@ -159,22 +155,29 @@ class _SignInScreenState extends State<SignInScreen> {
         return;
       }
 
-      setState(() {
-        _errorMessage = _parseSignInError(error);
-        if (_errorMessage!.contains('Invalid email or password') ||
-            _errorMessage!.contains('Sign-in failed')) {
+      if (error.toString().contains('item_share_unavailable')) {
+        setState(() {
+          _errorMessage = 'Item sharing feature is temporarily unavailable';
           _invalidCredentials = true;
-        }
-      });
+        });
+      } else {
+        setState(() {
+          _errorMessage = _parseSignInError(error);
+          if (_errorMessage!.contains('Invalid email or password') ||
+              _errorMessage!.contains('Sign-in failed')) {
+            _invalidCredentials = true;
+          }
+        });
 
-      // Auto-dismiss after 6 seconds
-      Future.delayed(const Duration(seconds: 6), () {
-        if (mounted && _errorMessage != null) {
-          setState(() {
-            _errorMessage = null;
-          });
-        }
-      });
+        // Auto-dismiss after 6 seconds
+        Future.delayed(const Duration(seconds: 6), () {
+          if (mounted && _errorMessage != null) {
+            setState(() {
+              _errorMessage = null;
+            });
+          }
+        });
+      }
     }
 
     if (!mounted) {
@@ -699,7 +702,6 @@ class _GlassInput extends StatelessWidget {
   final bool obscureText;
   final Widget? suffixIcon;
   final FormFieldValidator<String> validator;
-  final String? errorText;
   final ValueChanged<String>? onChanged;
 
   @override
@@ -715,7 +717,6 @@ class _GlassInput extends StatelessWidget {
         fontWeight: FontWeight.w600,
       ),
       decoration: InputDecoration(
-        errorText: errorText,
         hintText: hintText,
         hintStyle: TextStyle(color: Colors.grey.shade400),
         prefixIcon: Icon(prefixIcon, color: Colors.grey.shade500),
