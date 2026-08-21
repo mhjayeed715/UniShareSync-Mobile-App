@@ -445,7 +445,7 @@ class _CommunityDetailScreenState extends ConsumerState<CommunityDetailScreen> w
     final detailState = ref.watch(communityDetailProvider);
 
     return detailState.when(
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () => const _CommunityDetailSkeleton(),
       error: (e, s) => Scaffold(body: Center(child: Text('Error: $e'))),
       data: (community) {
         final isCreator = community.createdBy == _currentUserId;
@@ -1095,5 +1095,164 @@ class _SliverTabHeaderDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(_SliverTabHeaderDelegate oldDelegate) {
     return false;
+  }
+}
+
+class _CommunityDetailSkeleton extends StatefulWidget {
+  const _CommunityDetailSkeleton();
+
+  @override
+  State<_CommunityDetailSkeleton> createState() => _CommunityDetailSkeletonState();
+}
+
+class _CommunityDetailSkeletonState extends State<_CommunityDetailSkeleton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _gradientPosition;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat();
+    _gradientPosition = Tween<double>(begin: -2.0, end: 2.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          return Scaffold(
+            backgroundColor: const Color(0xFFF8FBFF),
+            body: CustomScrollView(
+              slivers: [
+                SliverAppBar(
+                  expandedHeight: 240,
+                  pinned: true,
+                  leading: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: CircleAvatar(
+                      backgroundColor: Colors.black.withOpacity(0.2),
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
+                        padding: EdgeInsets.zero,
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ),
+                  ),
+                  flexibleSpace: FlexibleSpaceBar(
+                    background: _buildShimmerBox(width: double.infinity, height: 240, borderRadius: 0),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 3),
+                              ),
+                              child: _buildShimmerCircle(radius: 36),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildShimmerBox(width: 180, height: 20, borderRadius: 4),
+                                  const SizedBox(height: 6),
+                                  _buildShimmerBox(width: 120, height: 12, borderRadius: 4),
+                                ],
+                              ),
+                            )
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        _buildShimmerBox(width: 100, height: 16, borderRadius: 4),
+                        const SizedBox(height: 12),
+                        _buildShimmerBox(width: double.infinity, height: 12, borderRadius: 4),
+                        const SizedBox(height: 8),
+                        _buildShimmerBox(width: double.infinity, height: 12, borderRadius: 4),
+                        const SizedBox(height: 8),
+                        _buildShimmerBox(width: 140, height: 12, borderRadius: 4),
+                        const SizedBox(height: 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildShimmerBox(width: 90, height: 14, borderRadius: 4),
+                            _buildShimmerBox(width: 120, height: 32, borderRadius: 16),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildShimmerCircle({required double radius}) {
+    return Container(
+      width: radius * 2,
+      height: radius * 2,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: _shimmerGradient(),
+      ),
+    );
+  }
+
+  Widget _buildShimmerBox({
+    required double width,
+    required double height,
+    required double borderRadius,
+  }) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(borderRadius),
+        gradient: _shimmerGradient(),
+      ),
+    );
+  }
+
+  LinearGradient _shimmerGradient() {
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: const [
+        Color(0xFFF1F5F9),
+        Color(0xFFE2E8F0),
+        Color(0xFFF1F5F9),
+      ],
+      stops: [
+        0.0,
+        0.5 + _gradientPosition.value * 0.25,
+        1.0,
+      ],
+    );
   }
 }

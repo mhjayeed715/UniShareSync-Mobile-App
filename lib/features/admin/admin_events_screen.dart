@@ -47,6 +47,37 @@ class _AdminEventsScreenState extends ConsumerState<AdminEventsScreen> {
     }
   }
 
+  void _deleteEvent(String eventId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Event', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text('Are you sure you want to permanently delete this event? This action cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await ref.read(eventsProvider.notifier).deleteEvent(eventId);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Event deleted successfully.')));
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete event: $e')));
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(eventsProvider);
@@ -109,6 +140,11 @@ class _AdminEventsScreenState extends ConsumerState<AdminEventsScreen> {
                                 tooltip: 'Reject',
                               ),
                             ],
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                              onPressed: () => _deleteEvent(event.id),
+                              tooltip: 'Delete',
+                            ),
                             IconButton(
                               icon: const Icon(Icons.dashboard_rounded, color: Color(0xFF4F9EFF)),
                               onPressed: () {

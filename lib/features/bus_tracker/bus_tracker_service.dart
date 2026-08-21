@@ -160,9 +160,12 @@ class BusTrackerService {
 
   // ── Broadcasting ──────────────────────────────────────────────────────────
 
+  StreamSubscription<Position>? _positionSub;
+  Position? _latestPosition;
+
   Timer? _broadcastTimer;
   String? _activeBusId;
-  bool get isBroadcasting => _broadcastTimer != null;
+  bool get isBroadcasting => _broadcastTimer != null || _positionSub != null;
   String? get activeBusId => _activeBusId;
 
   Future<String?> startBroadcasting(
@@ -185,20 +188,75 @@ class BusTrackerService {
     }
 
     _activeBusId = busId;
-    final firstError = await _broadcastOnce(busId, broadcasterName);
-    if (firstError != null) {
-      _activeBusId = null;
-      return firstError;
+
+    // 1. Try to get initial position to populate immediately
+    Position? initialPos;
+    try {
+      initialPos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 5),
+        ),
+      );
+    } catch (_) {
+      try {
+        initialPos = await Geolocator.getLastKnownPosition();
+      } catch (_) {}
     }
+
+    if (initialPos != null) {
+      _latestPosition = initialPos;
+      final firstError = await _broadcastPosition(busId, broadcasterName, initialPos);
+      if (firstError != null) {
+        _activeBusId = null;
+        _latestPosition = null;
+        return firstError;
+      }
+    }
+
+    // 2. Start Geolocator position stream for dynamic updates as the user moves
+    try {
+      _positionSub = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 3, // Emits when user moves 3 meters or more
+        ),
+      ).listen(
+        (pos) {
+          _latestPosition = pos;
+          _broadcastPosition(busId, broadcasterName, pos);
+        },
+        onError: (err) {
+          // ignore or handle stream errors
+        },
+      );
+    } catch (_) {
+      // In case starting stream fails
+    }
+
+    // If we could not obtain any initial position, and stream hasn't yielded yet,
+    // let's fail if we have absolutely no position.
+    if (_latestPosition == null) {
+      await stopBroadcasting();
+      return 'Could not get GPS location. Please try again.';
+    }
+
+    // 3. Periodic timer keeps updates fresh in database even if user stays static (prevents cleanup stale logic)
     _broadcastTimer = Timer.periodic(const Duration(seconds: 8), (_) {
-      _broadcastOnce(busId, broadcasterName);
+      if (_latestPosition != null) {
+        _broadcastPosition(busId, broadcasterName, _latestPosition!);
+      }
     });
+
     return null;
   }
 
   Future<void> stopBroadcasting() async {
     _broadcastTimer?.cancel();
     _broadcastTimer = null;
+    _positionSub?.cancel();
+    _positionSub = null;
+    _latestPosition = null;
     final busId = _activeBusId;
     _activeBusId = null;
     if (busId == null) return;
@@ -222,25 +280,15 @@ class BusTrackerService {
     } catch (_) {}
   }
 
-  Future<String?> _broadcastOnce(String busId, String broadcasterName) async {
-    Position? pos;
-    try {
-      pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 6),
-        ),
-      );
-    } catch (_) {
-      pos = await Geolocator.getLastKnownPosition();
-    }
-    if (pos == null) return 'Could not get GPS location. Please try again.';
+  Future<String?> _broadcastPosition(
+      String busId, String broadcasterName, Position pos) async {
     try {
       await _supabase.from(_table).upsert(
         {
           'bus_id': busId,
           'driver_id': _supabase.auth.currentUser?.id,
           'broadcaster_name': broadcasterName,
+          'session_token': _ownerToken,
           'latitude': pos.latitude,
           'longitude': pos.longitude,
           'heading': pos.heading,

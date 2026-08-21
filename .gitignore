@@ -47,3 +47,19 @@ app.*.map.json
 
 # SQL and migrations (local only)
 *.sql
+*.temp
+.temp/
+android/local.properties
+**/ephemeral/
+AndroidManifest_backup.xml
+PUSH_NOTIFICATION_FIX.md
+.gemini/
+.claude/
+.agents/
+.cursor/
+test/gen_seed.dart
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Runner/GeneratedPluginRegistrant.m
+macos/Flutter/ephemeral/
+

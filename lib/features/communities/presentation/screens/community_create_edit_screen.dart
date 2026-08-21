@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:unisharesync_mobile_app/data/models/user_role.dart';
+import 'package:unisharesync_mobile_app/services/auth_service.dart';
 import '../../data/models/community_model.dart';
 import '../providers/communities_provider.dart';
 import '../providers/community_detail_provider.dart';
@@ -26,6 +28,10 @@ class _CommunityCreateEditScreenState extends ConsumerState<CommunityCreateEditS
   String _selectedJoinType = 'open';
   String _selectedVisibility = 'public';
   bool _isLoading = false;
+
+  UserRole? _userRole;
+  List<Map<String, dynamic>> _facultyOptions = [];
+  String? _selectedFacultyHeadId;
 
   final List<String> _communityTypes = [
     'programming_club',
@@ -60,6 +66,50 @@ class _CommunityCreateEditScreenState extends ConsumerState<CommunityCreateEditS
       _selectedJoinType = comm.joinType;
       _selectedVisibility = comm.visibility;
     }
+
+    _loadUserRole();
+  }
+
+  Future<void> _loadUserRole() async {
+    final role = await AuthService().getCurrentRole();
+    if (mounted) {
+      setState(() {
+        _userRole = role;
+      });
+    }
+
+    if (role == UserRole.admin) {
+      try {
+        final res = await Supabase.instance.client
+            .from('profiles')
+            .select('id, full_name')
+            .eq('role', 'faculty');
+        if (mounted) {
+          setState(() {
+            _facultyOptions = List<Map<String, dynamic>>.from(res as List);
+            if (widget.existingCommunity != null) {
+              _loadCurrentFacultyHead();
+            }
+          });
+        }
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _loadCurrentFacultyHead() async {
+    try {
+      final res = await Supabase.instance.client
+          .from('community_members')
+          .select('user_id')
+          .eq('community_id', widget.existingCommunity!.id)
+          .eq('role', 'faculty_head')
+          .maybeSingle();
+      if (res != null && mounted) {
+        setState(() {
+          _selectedFacultyHeadId = res['user_id']?.toString();
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -83,7 +133,7 @@ class _CommunityCreateEditScreenState extends ConsumerState<CommunityCreateEditS
         .where((t) => t.isNotEmpty)
         .toList();
 
-    final data = {
+    final Map<String, dynamic> data = {
       'name': _nameController.text.trim(),
       'tagline': _taglineController.text.trim(),
       'description': _descriptionController.text.trim(),
@@ -95,6 +145,10 @@ class _CommunityCreateEditScreenState extends ConsumerState<CommunityCreateEditS
       'tags': tagsList,
       'updated_at': DateTime.now().toIso8601String(),
     };
+
+    if (_userRole == UserRole.admin && _selectedFacultyHeadId != null) {
+      data['faculty_head_id'] = _selectedFacultyHeadId;
+    }
 
     try {
       if (widget.existingCommunity != null) {
@@ -247,6 +301,28 @@ class _CommunityCreateEditScreenState extends ConsumerState<CommunityCreateEditS
                           hintText: 'e.g. AI, Cyber, Web3',
                         ),
                       ),
+                      if (_userRole == UserRole.admin && _facultyOptions.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        DropdownButtonFormField<String>(
+                          initialValue: _selectedFacultyHeadId,
+                          decoration: const InputDecoration(
+                            labelText: 'Faculty Head / Advisor',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: _facultyOptions.map((f) {
+                            return DropdownMenuItem<String>(
+                              value: f['id'].toString(),
+                              child: Text(f['full_name']?.toString() ?? 'Faculty'),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            setState(() {
+                              _selectedFacultyHeadId = val;
+                            });
+                          },
+                          validator: (val) => val == null ? 'Faculty Head is required' : null,
+                        ),
+                      ],
                       const SizedBox(height: 32),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(

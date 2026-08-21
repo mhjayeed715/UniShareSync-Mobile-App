@@ -54,57 +54,65 @@ class _CommunitiesBrowseScreenState extends ConsumerState<CommunitiesBrowseScree
         child: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) => [
             SliverAppBar(
-              floating: true,
+              floating: false,
               pinned: true,
-              expandedHeight: 170.0,
-              backgroundColor: Colors.white.withOpacity(0.85),
+              backgroundColor: Colors.transparent,
               elevation: 0,
+              centerTitle: false,
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
                 onPressed: () => Navigator.of(context).pop(),
               ),
-              flexibleSpace: FlexibleSpaceBar(
-                background: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 50, 16, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Communities',
-                        style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: TextField(
-                          controller: _searchController,
-                          onChanged: _onSearchChanged,
-                          decoration: const InputDecoration(
-                            hintText: 'Search communities (AI, Robotics, Programming)...',
-                            prefixIcon: Icon(Icons.search_rounded, color: Colors.grey),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(vertical: 14),
-                          ),
-                        ),
-                      )
-                    ],
-                  ),
+              title: const Text(
+                'Communities',
+                style: TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-            )
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: _onSearchChanged,
+                        decoration: const InputDecoration(
+                          hintText: 'Search communities (AI, Robotics, Programming)...',
+                          prefixIcon: Icon(Icons.search_rounded, color: Colors.grey),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    )
+                  ],
+                ),
+              ),
+            ),
           ],
           body: state.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: 3,
+              itemBuilder: (context, idx) {
+                return const _CommunityCardSkeleton();
+              },
+            ),
             error: (err, stack) => Center(child: Text('Error: $err')),
             data: (communities) {
               if (communities.isEmpty) {
@@ -217,6 +225,141 @@ class _CommunitiesBrowseScreenState extends ConsumerState<CommunitiesBrowseScree
           ),
         ),
       ),
+    );
+  }
+}
+
+class _CommunityCardSkeleton extends StatefulWidget {
+  const _CommunityCardSkeleton();
+
+  @override
+  State<_CommunityCardSkeleton> createState() => _CommunityCardSkeletonState();
+}
+
+class _CommunityCardSkeletonState extends State<_CommunityCardSkeleton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _gradientPosition;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat();
+    _gradientPosition = Tween<double>(begin: -2.0, end: 2.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          return Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.85),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withOpacity(0.9)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    _buildShimmerBox(width: double.infinity, height: 120, borderRadius: 20),
+                    Positioned(
+                      bottom: -16,
+                      left: 16,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                        ),
+                        child: _buildShimmerCircle(radius: 28),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildShimmerBox(width: 160, height: 18, borderRadius: 4),
+                      const SizedBox(height: 6),
+                      _buildShimmerBox(width: double.infinity, height: 12, borderRadius: 4),
+                      const SizedBox(height: 14),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildShimmerBox(width: 80, height: 12, borderRadius: 4),
+                          _buildShimmerBox(width: 70, height: 20, borderRadius: 6),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildShimmerCircle({required double radius}) {
+    return Container(
+      width: radius * 2,
+      height: radius * 2,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: _shimmerGradient(),
+      ),
+    );
+  }
+
+  Widget _buildShimmerBox({
+    required double width,
+    required double height,
+    required double borderRadius,
+  }) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(borderRadius),
+        gradient: _shimmerGradient(),
+      ),
+    );
+  }
+
+  LinearGradient _shimmerGradient() {
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: const [
+        Color(0xFFF1F5F9),
+        Color(0xFFE2E8F0),
+        Color(0xFFF1F5F9),
+      ],
+      stops: [
+        0.0,
+        0.5 + _gradientPosition.value * 0.25,
+        1.0,
+      ],
     );
   }
 }

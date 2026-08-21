@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:unisharesync_mobile_app/data/models/profile_model.dart';
 import 'package:unisharesync_mobile_app/data/models/user_role.dart';
@@ -17,6 +18,14 @@ class ProfileService {
     if (user == null) {
       return null;
     }
+
+    try {
+      final results = await Connectivity().checkConnectivity();
+      final isOffline = results.every((r) => r == ConnectivityResult.none);
+      if (isOffline) {
+        return _localSessionStore.getCachedProfile(user.id);
+      }
+    } catch (_) {}
 
     try {
       final response = await _client

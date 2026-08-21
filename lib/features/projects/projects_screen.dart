@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:unisharesync_mobile_app/core/widgets/glassmorphic_widgets.dart';
 import 'package:unisharesync_mobile_app/data/models/project_model.dart';
 import 'package:unisharesync_mobile_app/data/models/user_role.dart';
 import 'package:unisharesync_mobile_app/features/projects/components/project_filter_sheet.dart';
@@ -117,8 +118,31 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
           ),
         );
       },
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (err, _) => Scaffold(body: Center(child: Text('Error: $err', style: const TextStyle(color: Colors.redAccent)))),
+      loading: () => Scaffold(
+        backgroundColor: const Color(0xFFF4F8FF),
+        body: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              SkeletonListTile(),
+              SizedBox(height: 12),
+              SkeletonListTile(),
+              SizedBox(height: 12),
+              SkeletonListTile(),
+            ],
+          ),
+        ),
+      ),
+      error: (err, _) => Scaffold(
+        backgroundColor: const Color(0xFFF4F8FF),
+        body: ErrorStateWidget(
+          errorMessage: 'Failed to load projects: $err',
+          onRetry: () {
+            ref.refresh(discoverProjectsProvider);
+          },
+        ),
+      ),
     );
   }
 
@@ -127,13 +151,12 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
       backgroundColor: Colors.transparent,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
+      centerTitle: false,
       title: const Text(
         'Projects',
         style: TextStyle(
           color: Color(0xFF0F172A),
-          fontFamily: 'Outfit',
           fontWeight: FontWeight.w800,
-          fontSize: 26,
         ),
       ),
       actions: [
@@ -308,11 +331,12 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
         }
 
         if (list.isEmpty) {
-          return const Center(
-            child: Text(
-              'No projects found matching current tags.',
-              style: TextStyle(color: Color(0xFF64748B), fontSize: 16),
-            ),
+          return EmptyStateWidget(
+            title: 'No Projects Found',
+            description: mode == 'my_projects'
+                ? 'You have not joined or created any projects yet.'
+                : 'No projects match your current filters or search query.',
+            icon: Icons.account_tree_rounded,
           );
         }
 
@@ -330,12 +354,17 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
           },
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, _) => Center(
-        child: Text(
-          'Error: $err',
-          style: const TextStyle(color: Colors.redAccent),
-        ),
+      loading: () => ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: 4,
+        separatorBuilder: (_, __) => const SizedBox(height: 16),
+        itemBuilder: (_, __) => const SkeletonListTile(),
+      ),
+      error: (err, _) => ErrorStateWidget(
+        errorMessage: 'Failed to load list: $err',
+        onRetry: () {
+          ref.refresh(discoverProjectsProvider);
+        },
       ),
     );
   }

@@ -169,13 +169,15 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen>
                               ),
                               const SizedBox(height: 14),
                               _ChartCard(
-                                title: 'Busiest Bus Routes',
+                                title: 'Portal Feature Statistics',
                                 subtitle:
-                                    'Scheduled trips + live tracking activity',
-                                icon: Icons.directions_bus_rounded,
+                                    'Activity across Notices, Communities & Lost-Found',
+                                icon: Icons.dashboard_customize_rounded,
                                 iconColor: _Palette.teal,
-                                child: _BusRoutesChart(
-                                  routes: _snapshot.busRouteTraffic,
+                                child: _FeaturesBarChart(
+                                  notices: _snapshot.totalNotices,
+                                  communities: _snapshot.totalCommunities,
+                                  lostFound: _snapshot.totalLostFound,
                                 ),
                               ),
                               const SizedBox(height: 14),
@@ -652,48 +654,41 @@ class _WeeklyUsersChart extends StatelessWidget {
   }
 }
 
-class _BusRoutesChart extends StatelessWidget {
-  const _BusRoutesChart({required this.routes});
+class _FeaturesBarChart extends StatelessWidget {
+  const _FeaturesBarChart({
+    required this.notices,
+    required this.communities,
+    required this.lostFound,
+  });
 
-  final List<BusRouteTrafficStat> routes;
+  final int notices;
+  final int communities;
+  final int lostFound;
 
   @override
   Widget build(BuildContext context) {
-    if (routes.isEmpty) {
-      return const _EmptyChart(message: 'No bus route data yet');
-    }
+    final values = [notices.toDouble(), communities.toDouble(), lostFound.toDouble()];
+    final maxVal = values.reduce((a, b) => a > b ? a : b);
+    final maxY = maxVal < 4 ? 4.0 : maxVal * 1.25;
 
-    final maxY = routes
-            .map((r) => r.activityScore)
-            .reduce((a, b) => a > b ? a : b)
-            .toDouble() *
-        1.2;
-
-    const colors = [
-      _Palette.teal,
-      _Palette.primary,
-      _Palette.emerald,
-      _Palette.amber,
-      _Palette.purple,
-    ];
+    final labels = ['Notices', 'Communities', 'Lost & Found'];
+    final colors = [_Palette.amber, _Palette.purple, _Palette.teal];
 
     return SizedBox(
       height: 220,
       child: BarChart(
         BarChartData(
-          maxY: maxY < 4 ? 4 : maxY,
+          maxY: maxY,
           alignment: BarChartAlignment.spaceAround,
           barTouchData: BarTouchData(
             touchTooltipData: BarTouchTooltipData(
               getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                final route = routes[group.x];
                 return BarTooltipItem(
-                  '${route.routeName}\n${route.scheduledTrips} trips · '
-                  '${route.liveSessions} live',
+                  '${labels[group.x]}\n${rod.toY.toInt()} items',
                   const TextStyle(
                     color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12.5,
                   ),
                 );
               },
@@ -716,16 +711,16 @@ class _BusRoutesChart extends StatelessWidget {
                 reservedSize: 32,
                 getTitlesWidget: (value, meta) {
                   final i = value.toInt();
-                  if (i < 0 || i >= routes.length) {
+                  if (i < 0 || i >= labels.length) {
                     return const SizedBox.shrink();
                   }
                   return Padding(
                     padding: const EdgeInsets.only(top: 6),
                     child: Text(
-                      routes[i].routeName,
+                      labels[i],
                       style: const TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
                         color: _Palette.textSecondary,
                       ),
                     ),
@@ -750,24 +745,25 @@ class _BusRoutesChart extends StatelessWidget {
           ),
           borderData: FlBorderData(show: false),
           barGroups: [
-            for (var i = 0; i < routes.length; i++)
+            for (var i = 0; i < 3; i++)
               BarChartGroupData(
                 x: i,
                 barRods: [
                   BarChartRodData(
-                    toY: routes[i].activityScore.toDouble(),
-                    width: 20,
-                    color: colors[i % colors.length],
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(6),
+                    toY: values[i],
+                    color: colors[i],
+                    width: 28,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                    backDrawRodData: BackgroundBarChartRodData(
+                      show: true,
+                      toY: maxY,
+                      color: colors[i].withOpacity(0.05),
                     ),
                   ),
                 ],
               ),
           ],
         ),
-        duration: const Duration(milliseconds: 700),
-        curve: Curves.easeOutCubic,
       ),
     );
   }

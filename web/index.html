@@ -31,8 +31,11 @@
   <meta name="application-name" content="UniShareSync">
   <meta name="theme-color" content="#4F9EFF">
 
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
+  <!-- Favicon and App Icons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon.png"/>
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/Icon-192.png"/>
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/Icon-192.png"/>
+  <link rel="shortcut icon" href="favicon.png"/>
 
   <title>UniShareSync</title>
   <link rel="manifest" href="manifest.json">
@@ -42,10 +45,12 @@
   <script src="assets/passkeys/bundle.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/firebase-messaging-sw.js').then(function(reg) {
-        console.log('[ServiceWorker] Firebase Messaging Service Worker registered successfully', reg);
-      }).catch(function(err) {
-        console.log('[ServiceWorker] Service Worker registration failed: ', err);
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('firebase-messaging-sw.js').then(function(reg) {
+          console.log('[ServiceWorker] Firebase Messaging Service Worker registered successfully', reg);
+        }).catch(function(err) {
+          console.log('[ServiceWorker] Service Worker registration failed: ', err);
+        });
       });
     }
   </script>

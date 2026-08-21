@@ -19,7 +19,7 @@ class ProjectWhiteboardScreen extends ConsumerStatefulWidget {
 
 class _ProjectWhiteboardScreenState extends ConsumerState<ProjectWhiteboardScreen> {
   final TransformationController _transformationController = TransformationController();
-  final String _currentSessionStrokeId = const Uuid().v4();
+  String? _activeStrokeId;
   bool _isReadOnly = false;
 
   @override
@@ -57,18 +57,6 @@ class _ProjectWhiteboardScreenState extends ConsumerState<ProjectWhiteboardScree
         ),
         iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
         actions: [
-          // Active cursors count
-          Row(
-            children: [
-              const Icon(Icons.people, color: Colors.green),
-              const SizedBox(width: 4),
-              Text(
-                '${boardState.activeUsers.length + 1}',
-                style: const TextStyle(color: Color(0xFF0F172A), fontSize: 13, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(width: 16),
-            ],
-          ),
           if (!_isReadOnly)
             IconButton(
               icon: const Icon(Icons.delete_sweep, color: Colors.redAccent),
@@ -76,8 +64,24 @@ class _ProjectWhiteboardScreenState extends ConsumerState<ProjectWhiteboardScree
             ),
         ],
       ),
-      body: boardState.isLoading
-          ? const Center(child: CircularProgressIndicator())
+      body: boardState.isLoading || !boardState.isReady
+          ? const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text(
+                    'Connecting to live whiteboard...',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontFamily: 'Outfit',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            )
           : Stack(
               children: [
                 // Zoomable/Pannable Whiteboard area
@@ -105,36 +109,27 @@ class _ProjectWhiteboardScreenState extends ConsumerState<ProjectWhiteboardScree
                             onPanStart: _isReadOnly
                                 ? null
                                 : (details) {
-                                    final renderBox = context.findRenderObject() as RenderBox;
-                                    final localPos = renderBox.globalToLocal(details.globalPosition);
-                                    
-                                    // Translate position based on zoom scale Matrix4
-                                    final offset = _transformationController.toScene(localPos);
-
+                                    final localPos = details.localPosition;
                                     final strokeId = const Uuid().v4();
+                                    _activeStrokeId = strokeId;
                                     notifier.drawStrokeStart(
                                       strokeId,
-                                      StrokePoint(x: offset.dx, y: offset.dy),
+                                      StrokePoint(x: localPos.dx, y: localPos.dy),
                                     );
                                   },
                             onPanUpdate: _isReadOnly
                                 ? null
                                 : (details) {
-                                    final renderBox = context.findRenderObject() as RenderBox;
-                                    final localPos = renderBox.globalToLocal(details.globalPosition);
-                                    final offset = _transformationController.toScene(localPos);
-
-                                    final strokesList = ref.read(whiteboardBoardProvider(widget.projectId)).canvasState.strokes;
-                                    if (strokesList.isNotEmpty) {
-                                      final lastStrokeId = strokesList.last.id;
-                                      notifier.drawStrokePoint(
-                                        lastStrokeId,
-                                        StrokePoint(x: offset.dx, y: offset.dy),
-                                      );
-                                    }
-                                    
-                                    notifier.broadcastCursor(offset.dx, offset.dy);
+                                    if (_activeStrokeId == null) return;
+                                    final localPos = details.localPosition;
+                                    notifier.drawStrokePoint(
+                                      _activeStrokeId!,
+                                      StrokePoint(x: localPos.dx, y: localPos.dy),
+                                    );
                                   },
+                            onPanEnd: (_) {
+                              _activeStrokeId = null;
+                            },
                             child: CustomPaint(
                               painter: WhiteboardPainter(strokes: boardState.canvasState.strokes),
                             ),
@@ -147,15 +142,6 @@ class _ProjectWhiteboardScreenState extends ConsumerState<ProjectWhiteboardScree
                             left: note.x,
                             top: note.y,
                             child: _buildStickyNoteWidget(note, notifier),
-                          );
-                        }),
-
-                        // Users Presence Cursors
-                        ...boardState.activeUsers.values.map((user) {
-                          return Positioned(
-                            left: user.cursorX,
-                            top: user.cursorY,
-                            child: _buildPresenceCursorWidget(user),
                           );
                         }),
                       ],
@@ -181,10 +167,11 @@ class _ProjectWhiteboardScreenState extends ConsumerState<ProjectWhiteboardScree
       onPanUpdate: _isReadOnly
           ? null
           : (details) {
+               final double scale = _transformationController.value.getMaxScaleOnAxis();
                notifier.moveStickyNote(
                  note.id,
-                 note.x + details.delta.dx,
-                 note.y + details.delta.dy,
+                 note.x + details.delta.dx / scale,
+                 note.y + details.delta.dy / scale,
                );
              },
       child: Card(
@@ -211,30 +198,7 @@ class _ProjectWhiteboardScreenState extends ConsumerState<ProjectWhiteboardScree
     );
   }
 
-  Widget _buildPresenceCursorWidget(PresenceUser user) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(
-          Icons.navigation,
-          color: Color(int.parse(user.avatarColor.replaceFirst('#', '0xFF'))),
-          size: 20,
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: Color(int.parse(user.avatarColor.replaceFirst('#', '0xFF'))),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(
-            user.displayName,
-            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-          ),
-        ),
-      ],
-    );
-  }
+
 
   Widget _buildDrawingToolbox(WhiteboardNotifier notifier, WhiteboardBoardState state) {
     return ClipRRect(

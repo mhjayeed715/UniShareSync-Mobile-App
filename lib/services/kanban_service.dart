@@ -73,6 +73,19 @@ class KanbanService {
         .toList();
   }
 
+  Future<KanbanTask> fetchTask(String taskId) async {
+    final response = await _client.from('kanban_tasks').select('''
+          *,
+          task_assignees(*),
+          task_labels(*),
+          task_checklist_items(*),
+          task_attachments(*),
+          task_comments(*, profiles!user_id(full_name, avatar_url))
+        ''').eq('id', taskId).single();
+
+    return KanbanTask.fromMap(Map<String, dynamic>.from(response));
+  }
+
   Future<KanbanTask> createTask({
     required String projectId,
     required String columnId,
@@ -148,6 +161,11 @@ class KanbanService {
         .eq('id', taskId);
 
     await logActivity(taskId, projectId, 'details_updated', {'title': title});
+  }
+
+  Future<void> deleteTask(String taskId, String projectId) async {
+    await _client.from('kanban_tasks').delete().eq('id', taskId);
+    await logActivity(taskId, projectId, 'deleted', {});
   }
 
   // --- Assignees & Labels ---

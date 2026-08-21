@@ -35,8 +35,9 @@ class CommunityDetailNotifier extends StateNotifier<AsyncValue<CommunityModel>> 
   void subscribeToMemberCount(String communityId) {
     _memberCountSubscription?.cancel();
     _memberCountSubscription = _client
-        .from('communities:id=eq.$communityId')
+        .from('communities')
         .stream(primaryKey: ['id'])
+        .eq('id', communityId)
         .listen((data) {
           if (data.isNotEmpty && state is AsyncData<CommunityModel>) {
             final currentData = state.value!;

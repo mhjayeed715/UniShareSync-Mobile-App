@@ -176,10 +176,17 @@ class _ProfileManagementScreenState extends State<ProfileManagementScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F8FF),
       appBar: AppBar(
-        title: const Text('Profile Management'),
         backgroundColor: Colors.transparent,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
+        centerTitle: false,
+        title: const Text(
+          'Profile Management',
+          style: TextStyle(
+            color: Color(0xFF0F172A),
+            fontWeight: FontWeight.w800,
+          ),
+        ),
       ),
       body: _isLoading
           ? const _ProfileSkeleton()
@@ -201,34 +208,83 @@ class _ProfileManagementScreenState extends State<ProfileManagementScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Center(
-                          child: Column(
+                          child: Stack(
                             children: [
-                              CircleAvatar(
-                                radius: 46,
-                                backgroundColor: const Color(0xFF4F9EFF).withOpacity(0.15),
-                                backgroundImage: _selectedImageBytes != null
-                                    ? MemoryImage(_selectedImageBytes!)
-                                    : (profile.avatarUrl != null
-                                        ? NetworkImage(profile.avatarUrl!)
-                                        : null) as ImageProvider<Object>?,
-                                child: _selectedImageBytes == null && profile.avatarUrl == null
-                                    ? Text(
-                                        profile.fullName.isNotEmpty
-                                            ? profile.fullName[0].toUpperCase()
-                                            : 'U',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 22,
-                                          color: Color(0xFF2B5B94),
-                                        ),
-                                      )
-                                    : null,
+                              Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 4,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.08),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: CircleAvatar(
+                                  radius: 54,
+                                  backgroundColor: const Color(0xFF4F9EFF).withOpacity(0.15),
+                                  backgroundImage: _selectedImageBytes != null
+                                      ? MemoryImage(_selectedImageBytes!)
+                                      : (profile.avatarUrl != null
+                                          ? NetworkImage(profile.avatarUrl!)
+                                          : null) as ImageProvider<Object>?,
+                                  child: _selectedImageBytes == null && profile.avatarUrl == null
+                                      ? Text(
+                                          profile.fullName.isNotEmpty
+                                              ? profile.fullName[0].toUpperCase()
+                                              : 'U',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 26,
+                                            color: Color(0xFF2B5B94),
+                                          ),
+                                        )
+                                      : null,
+                                ),
                               ),
-                              const SizedBox(height: 10),
-                              TextButton.icon(
-                                onPressed: _pickPhoto,
-                                icon: const Icon(Icons.upload_rounded),
-                                label: const Text('Upload Profile Photo'),
+                              Positioned.fill(
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: _pickPhoto,
+                                    customBorder: const CircleBorder(),
+                                    splashColor: const Color(0xFF4F9EFF).withOpacity(0.15),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                bottom: 4,
+                                right: 4,
+                                child: IgnorePointer(
+                                  child: Container(
+                                    padding: const EdgeInsets.all(7),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF4F9EFF),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.white,
+                                        width: 2.5,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.15),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.camera_alt_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ],
                           ),

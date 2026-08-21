@@ -165,6 +165,7 @@ class _BusTrackerScreenState extends State<BusTrackerScreen>
     final now = DateTime.now();
     return _liveLocations.values
         .where((loc) => now.toUtc().difference(loc.updatedAt).inSeconds < BusTrackerService.staleSeconds)
+        .where((loc) => loc.busId == _selectedRouteId)
         .map((loc) {
       final route = kBusRoutes.firstWhere((r) => r.id == loc.busId,
           orElse: () => kBusRoutes.first);
@@ -408,6 +409,7 @@ class _BusTrackerScreenState extends State<BusTrackerScreen>
               backgroundColor: Colors.transparent,
               elevation: 0,
               surfaceTintColor: Colors.transparent,
+              centerTitle: false,
               title: const Text('Campus Bus Tracker',
                   style: TextStyle(
                       fontWeight: FontWeight.w800,

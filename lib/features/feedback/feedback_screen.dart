@@ -386,10 +386,11 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
+        centerTitle: false,
         leading: Navigator.of(context).canPop()
             ? IconButton(
                 onPressed: () => Navigator.of(context).maybePop(),
-                icon: const Icon(Icons.arrow_back_rounded),
+                icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
               )
             : null,
         title: const Text(
@@ -399,7 +400,6 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
             fontWeight: FontWeight.w800,
           ),
         ),
-        centerTitle: false,
       ),
       backgroundColor: const Color(0xFFF4F8FF),
       body: Stack(
@@ -471,7 +471,6 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
                 child: _HeaderBlock(
-                  title: 'Feedback & Suggestions',
                   subtitle:
                       'Share thoughts, track replies, and help improve the university experience.',
                   icon: Icons.forum_rounded,
@@ -836,7 +835,6 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
                 child: _HeaderBlock(
-                  title: 'Feedback Management',
                   subtitle:
                       'Monitor and respond to student feedback and suggestions.',
                   icon: Icons.admin_panel_settings_rounded,
@@ -1085,12 +1083,10 @@ class _FeedbackErrorState extends StatelessWidget {
 
 class _HeaderBlock extends StatelessWidget {
   const _HeaderBlock({
-    required this.title,
     required this.subtitle,
     required this.icon,
   });
 
-  final String title;
   final String subtitle;
   final IconData icon;
 
@@ -1129,15 +1125,6 @@ class _HeaderBlock extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
                     Text(
                       subtitle,
                       style: TextStyle(color: Colors.grey.shade700, height: 1.35),

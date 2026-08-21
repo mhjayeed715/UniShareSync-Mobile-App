@@ -83,7 +83,7 @@ class _AdminClassSchedulerScreenState extends State<AdminClassSchedulerScreen> {
       }
 
       setState(() {
-        _entries = const <ScheduleEntry>[];
+        _entries = fallback.entries;
         _timeSlots = fallback.timeSlots;
         _isOverride = false;
         _cachedAt = fallback.cachedAt;

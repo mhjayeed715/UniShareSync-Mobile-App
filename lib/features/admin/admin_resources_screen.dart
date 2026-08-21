@@ -151,6 +151,17 @@ class _AdminResourcesScreenState extends State<AdminResourcesScreen> {
     }
   }
 
+  Future<void> _reEmbed(ResourceItem item) async {
+    try {
+      await _service.reEmbedResource(resourceId: item.id);
+      if (!mounted) return;
+      _snack('Re-indexing started for "${item.title}".');
+    } catch (e) {
+      if (!mounted) return;
+      _snack('Re-index failed: $e');
+    }
+  }
+
   Future<void> _reject(ResourceItem item) async {
     final ctrl = TextEditingController();
     final reason = await showDialog<String>(
@@ -439,6 +450,10 @@ class _AdminResourcesScreenState extends State<AdminResourcesScreen> {
           onDelete: () => _delete(items[i]),
           onApprove: () => _approve(items[i]),
           onReject: () => _reject(items[i]),
+          onReEmbed: items[i].approvalStatus == ResourceApprovalStatus.approved &&
+                  items[i].fileType != ResourceFileType.image
+              ? () => _reEmbed(items[i])
+              : null,
         ),
       ),
     );
@@ -492,6 +507,7 @@ class _AdminResourceCard extends StatelessWidget {
     required this.onDelete,
     required this.onApprove,
     required this.onReject,
+    this.onReEmbed,
   });
 
   final ResourceItem item;
@@ -499,7 +515,7 @@ class _AdminResourceCard extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onApprove;
   final VoidCallback onReject;
-
+  final VoidCallback? onReEmbed;
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
@@ -572,10 +588,10 @@ class _AdminResourceCard extends StatelessWidget {
                       if (v == 'edit') onEdit();
                       if (v == 'delete') onDelete();
                     },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(
                           value: 'edit', child: Text('Edit Resource')),
-                      PopupMenuItem(
+                      const PopupMenuItem(
                           value: 'delete',
                           child: Text('Delete Resource',
                               style: TextStyle(color: Colors.redAccent))),
@@ -615,6 +631,23 @@ class _AdminResourceCard extends StatelessWidget {
                         color: Color(0xFF991B1B),
                         fontWeight: FontWeight.w600,
                         fontSize: 12),
+                  ),
+                ),
+              ],
+              if (item.approvalStatus == ResourceApprovalStatus.approved &&
+                  item.fileType != ResourceFileType.image &&
+                  onReEmbed != null) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: onReEmbed,
+                    icon: const Icon(Icons.refresh_rounded, size: 16),
+                    label: const Text('Re-index AI'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF1D4ED8),
+                      side: const BorderSide(color: Color(0xFFBFDBFE)),
+                    ),
                   ),
                 ),
               ],

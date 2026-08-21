@@ -63,20 +63,64 @@ class KanbanBoardNotifier extends StateNotifier<KanbanBoardState> {
   void _subscribeToRealtime() {
     final client = Supabase.instance.client;
     
-    // Subscribing to postgres changes on kanban_tasks for this project
-    _channel = client.channel('project_kanban_$_projectId').onPostgresChanges(
-      event: PostgresChangeEvent.all,
-      schema: 'public',
-      table: 'kanban_tasks',
-      filter: PostgresChangeFilter(
-        type: PostgresChangeFilterType.eq,
-        column: 'project_id',
-        value: _projectId,
-      ),
-      callback: (payload) {
-        _handleRealtimeUpdate(payload);
-      },
-    );
+    // Subscribing to postgres changes on kanban_tasks and kanban_columns without project_id filter to allow DELETE events to be captured (as delete oldRecord lacks project_id)
+    _channel = client.channel('project_kanban_$_projectId')
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'kanban_tasks',
+        callback: (payload) {
+          _handleRealtimeUpdate(payload);
+        },
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'kanban_columns',
+        callback: (payload) {
+          _handleColumnRealtimeUpdate(payload);
+        },
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'task_comments',
+        callback: (payload) {
+          _handleSubTableRealtimeUpdate(payload);
+        },
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'task_checklist_items',
+        callback: (payload) {
+          _handleSubTableRealtimeUpdate(payload);
+        },
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'task_assignees',
+        callback: (payload) {
+          _handleSubTableRealtimeUpdate(payload);
+        },
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'task_labels',
+        callback: (payload) {
+          _handleSubTableRealtimeUpdate(payload);
+        },
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'task_attachments',
+        callback: (payload) {
+          _handleSubTableRealtimeUpdate(payload);
+        },
+      );
     
     _channel?.subscribe();
   }
@@ -88,39 +132,104 @@ class KanbanBoardNotifier extends StateNotifier<KanbanBoardState> {
 
     if (eventType == PostgresChangeEvent.insert && record.isNotEmpty) {
       final newTask = KanbanTask.fromMap(record);
+      if (newTask.projectId != _projectId) return;
+      
       // Avoid inserting duplicates
       if (!state.tasks.any((t) => t.id == newTask.id)) {
         state = state.copyWith(tasks: [...state.tasks, newTask]);
       }
     } else if (eventType == PostgresChangeEvent.update && record.isNotEmpty) {
       final updatedTask = KanbanTask.fromMap(record);
+      if (updatedTask.projectId != _projectId) return;
+
       state = state.copyWith(
         tasks: state.tasks.map((t) {
           if (t.id == updatedTask.id) {
             // Keep relations that aren't in payload unless we reload
-            return updatedTask;
+            return KanbanTask(
+              id: updatedTask.id,
+              projectId: updatedTask.projectId,
+              columnId: updatedTask.columnId,
+              title: updatedTask.title,
+              description: updatedTask.description,
+              priority: updatedTask.priority,
+              dueDate: updatedTask.dueDate,
+              position: updatedTask.position,
+              isOverdue: updatedTask.isOverdue,
+              createdBy: updatedTask.createdBy,
+              createdAt: updatedTask.createdAt,
+              updatedAt: updatedTask.updatedAt,
+              assignees: t.assignees,
+              labels: t.labels,
+              checklist: t.checklist,
+              attachments: t.attachments,
+              comments: t.comments,
+            );
           }
           return t;
         }).toList(),
       );
-      // Reload relations in background to ensure correct joins
+      // Reload relations in background using single task fetch to ensure correct joins
       _reloadTaskJoins(updatedTask.id);
     } else if (eventType == PostgresChangeEvent.delete && oldRecord.isNotEmpty) {
       final deletedId = oldRecord['id'] as String;
-      state = state.copyWith(
-        tasks: state.tasks.where((t) => t.id != deletedId).toList(),
-      );
+      if (state.tasks.any((t) => t.id == deletedId)) {
+        state = state.copyWith(
+          tasks: state.tasks.where((t) => t.id != deletedId).toList(),
+        );
+      }
     }
   }
 
   Future<void> _reloadTaskJoins(String taskId) async {
     try {
-      final updatedTasks = await _service.fetchTasks(_projectId);
-      final freshTask = updatedTasks.firstWhere((t) => t.id == taskId);
-      state = state.copyWith(
-        tasks: state.tasks.map((t) => t.id == taskId ? freshTask : t).toList(),
-      );
+      final freshTask = await _service.fetchTask(taskId);
+      if (freshTask.projectId == _projectId) {
+        state = state.copyWith(
+          tasks: state.tasks.map((t) => t.id == taskId ? freshTask : t).toList(),
+        );
+      }
     } catch (_) {}
+  }
+
+  Future<void> _handleColumnRealtimeUpdate(dynamic payload) async {
+    final eventType = payload.eventType;
+    final record = payload.newRecord;
+    final oldRecord = payload.oldRecord;
+
+    if (eventType == PostgresChangeEvent.insert && record.isNotEmpty) {
+      final newCol = KanbanColumn.fromMap(record);
+      if (newCol.projectId != _projectId) return;
+
+      if (!state.columns.any((c) => c.id == newCol.id)) {
+        final updatedCols = [...state.columns, newCol]..sort((a, b) => a.position.compareTo(b.position));
+        state = state.copyWith(columns: updatedCols);
+      }
+    } else if (eventType == PostgresChangeEvent.update && record.isNotEmpty) {
+      final updatedCol = KanbanColumn.fromMap(record);
+      if (updatedCol.projectId != _projectId) return;
+
+      final updatedCols = state.columns.map((c) => c.id == updatedCol.id ? updatedCol : c).toList()
+        ..sort((a, b) => a.position.compareTo(b.position));
+      state = state.copyWith(columns: updatedCols);
+    } else if (eventType == PostgresChangeEvent.delete && oldRecord.isNotEmpty) {
+      final deletedId = oldRecord['id'] as String;
+      if (state.columns.any((c) => c.id == deletedId)) {
+        state = state.copyWith(
+          columns: state.columns.where((c) => c.id != deletedId).toList(),
+          tasks: state.tasks.where((t) => t.columnId != deletedId).toList(),
+        );
+      }
+    }
+  }
+
+  void _handleSubTableRealtimeUpdate(dynamic payload) {
+    final record = payload.newRecord;
+    final oldRecord = payload.oldRecord;
+    final taskId = (record.isNotEmpty ? record['task_id'] : oldRecord['task_id']) as String?;
+    if (taskId != null) {
+      _reloadTaskJoins(taskId);
+    }
   }
 
   // --- Optimistic Local UI Moves ---

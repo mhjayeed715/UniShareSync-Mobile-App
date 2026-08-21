@@ -291,6 +291,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
+        centerTitle: false,
         title: const Text(
           'Notifications',
           style: TextStyle(
@@ -362,8 +363,8 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                   Expanded(
                     child: TabBarView(
                       children: [
-                        _buildNoticesTab(),
-                        _buildSystemNotificationsTab(),
+                        _KeepAliveWrapper(child: _buildNoticesTab()),
+                        _KeepAliveWrapper(child: _buildSystemNotificationsTab()),
                       ],
                     ),
                   ),
@@ -893,4 +894,25 @@ class _GlassCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _KeepAliveWrapper extends StatefulWidget {
+  const _KeepAliveWrapper({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_KeepAliveWrapper> createState() => _KeepAliveWrapperState();
+}
+
+class _KeepAliveWrapperState extends State<_KeepAliveWrapper>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+
+  @override
+  bool get wantKeepAlive => true;
 }

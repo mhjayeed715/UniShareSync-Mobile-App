@@ -109,6 +109,10 @@ class _ClassSchedulerScreenState extends State<ClassSchedulerScreen> {
           return;
         }
 
+        if (entries.isEmpty) {
+          return;
+        }
+
         final timeSlots = _deriveTimeSlots(entries, fallback: _timeSlots);
 
         setState(() {
@@ -391,7 +395,7 @@ class _ClassSchedulerScreenState extends State<ClassSchedulerScreen> {
     final dayGroups = _groupByDay(entries);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(0, 4, 0, 118),
+      padding: const EdgeInsets.fromLTRB(0, 16, 0, 118),
       children: [
         _buildStudentFilters(),
         const SizedBox(height: 12),
@@ -425,7 +429,7 @@ class _ClassSchedulerScreenState extends State<ClassSchedulerScreen> {
     final dayGroups = _groupByDay(entries);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(0, 4, 0, 118),
+      padding: const EdgeInsets.fromLTRB(0, 16, 0, 118),
       children: [
         _buildFacultyFilters(),
         const SizedBox(height: 12),
@@ -494,7 +498,7 @@ class _ClassSchedulerScreenState extends State<ClassSchedulerScreen> {
             .toList();
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(0, 4, 0, 118),
+      padding: const EdgeInsets.fromLTRB(0, 16, 0, 118),
       children: [
         _buildRoomFilters(
           dayOptions: dayOptions,
@@ -545,6 +549,7 @@ class _ClassSchedulerScreenState extends State<ClassSchedulerScreen> {
       children: [
         Expanded(
           child: DropdownButtonFormField<int>(
+            isExpanded: true,
             initialValue: _selectedSemester,
             decoration: _dropdownDecoration('Semester'),
             items: semesters
@@ -568,6 +573,7 @@ class _ClassSchedulerScreenState extends State<ClassSchedulerScreen> {
         const SizedBox(width: 10),
         Expanded(
           child: DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: _selectedGroup,
             decoration: _dropdownDecoration('Group'),
             items: groups
@@ -654,7 +660,7 @@ class _ClassSchedulerScreenState extends State<ClassSchedulerScreen> {
     final isCompact = MediaQuery.of(context).size.width < 600;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(0, 4, 0, 118),
+      padding: const EdgeInsets.fromLTRB(0, 16, 0, 118),
       children: [
         _buildStudentFilters(),
         const SizedBox(height: 12),
@@ -697,7 +703,7 @@ class _ClassSchedulerScreenState extends State<ClassSchedulerScreen> {
     final isCompact = MediaQuery.of(context).size.width < 600;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(0, 4, 0, 118),
+      padding: const EdgeInsets.fromLTRB(0, 16, 0, 118),
       children: [
         _buildFacultyFilters(),
         const SizedBox(height: 12),
@@ -815,6 +821,7 @@ class _ClassSchedulerScreenState extends State<ClassSchedulerScreen> {
     final facultyOptions = _facultyOptions();
 
     return DropdownButtonFormField<String>(
+      isExpanded: true,
       initialValue: _selectedFacultyInitial,
       decoration: _dropdownDecoration('Faculty'),
       items: facultyOptions
@@ -844,6 +851,7 @@ class _ClassSchedulerScreenState extends State<ClassSchedulerScreen> {
           builder: (context, constraints) {
             final isNarrow = constraints.maxWidth < 600;
             final dayField = DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: selectedDay,
               decoration: _dropdownDecoration('Day'),
               items: dayOptions
@@ -861,6 +869,7 @@ class _ClassSchedulerScreenState extends State<ClassSchedulerScreen> {
               },
             );
             final slotField = DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: selectedSlotLabel,
               decoration: _dropdownDecoration('All Times'),
               items: _timeSlots
@@ -921,6 +930,7 @@ class _ClassSchedulerScreenState extends State<ClassSchedulerScreen> {
       labelText: label,
       filled: true,
       fillColor: Colors.white.withOpacity(0.9),
+      contentPadding: const EdgeInsets.fromLTRB(16, 20, 12, 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide.none,

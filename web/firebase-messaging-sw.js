@@ -12,15 +12,43 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// Firebase Web SDK automatically displays notifications for messages containing a top-level `notification` payload.
+// We only invoke `showNotification` manually if the message is a data-only payload to avoid duplicate popups.
 messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Received background message ', payload);
-  const notificationTitle = payload.notification?.title || payload.data?.title || 'UniShareSync Notice';
-  const notificationOptions = {
-    body: payload.notification?.body || payload.data?.body || '',
-    icon: '/icons/Icon-192.png',
-    badge: '/icons/Icon-192.png',
-    data: payload.data
-  };
+  console.log('[firebase-messaging-sw.js] Received background message:', payload);
+  if (!payload.notification && payload.data) {
+    const notificationTitle = payload.data.title || 'UniShareSync Notice';
+    const iconUrl = new URL('icons/Icon-192.png', self.location.origin).href;
+    const notificationOptions = {
+      body: payload.data.body || '',
+      icon: iconUrl,
+      // Note: Do NOT set colored images as `badge` on WebPush for Android, as Android forces an alpha-mask causing a black box.
+      tag: payload.data.type ? `${payload.data.type}_${payload.data.id ?? Date.now()}` : 'unisharesync-notice',
+      data: payload.data,
+      renotify: true
+    };
 
-  self.registration.showNotification(notificationTitle, notificationOptions);
+    return self.registration.showNotification(notificationTitle, notificationOptions);
+  }
 });
+
+// Handle notification click to open/focus the UniShareSync web app
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = new URL('/', self.location.origin).href;
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (let i = 0; i < windowClients.length; i++) {
+        const client = windowClients[i];
+        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+

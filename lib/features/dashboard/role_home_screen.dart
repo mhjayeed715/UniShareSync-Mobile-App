@@ -2402,7 +2402,6 @@ class _SettingsRow extends StatelessWidget {
     required this.iconColor,
     required this.label,
     required this.onTap,
-    this.trailing,
     this.isDestructive = false,
   });
 

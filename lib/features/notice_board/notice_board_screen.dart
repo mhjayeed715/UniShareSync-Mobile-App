@@ -27,6 +27,7 @@ class _NoticeBoardScreenState extends State<NoticeBoardScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
+        centerTitle: false,
         title: const Text(
           'Notice Board',
           style: TextStyle(

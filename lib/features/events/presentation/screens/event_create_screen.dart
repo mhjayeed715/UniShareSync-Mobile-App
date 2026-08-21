@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:unisharesync_mobile_app/data/models/user_role.dart';
+import 'package:unisharesync_mobile_app/services/auth_service.dart';
 import '../providers/events_provider.dart';
 import '../../data/models/event_model.dart';
 
@@ -38,6 +41,10 @@ class _EventCreateScreenState extends ConsumerState<EventCreateScreen> {
   Uint8List? _bannerBytes;
   String? _bannerName;
 
+  UserRole? _userRole;
+  List<Map<String, dynamic>> _facultyOptions = [];
+  String? _selectedFacultyInChargeId;
+
   @override
   void initState() {
     super.initState();
@@ -56,6 +63,31 @@ class _EventCreateScreenState extends ConsumerState<EventCreateScreen> {
       _deadline = evt.registrationDeadline;
       _startTime = TimeOfDay.fromDateTime(evt.eventDate);
       _endTime = TimeOfDay.fromDateTime(evt.eventEndDate);
+      _selectedFacultyInChargeId = evt.facultyInChargeId;
+    }
+    _loadUserRole();
+  }
+
+  Future<void> _loadUserRole() async {
+    final role = await AuthService().getCurrentRole();
+    if (mounted) {
+      setState(() {
+        _userRole = role;
+      });
+    }
+
+    if (role == UserRole.admin) {
+      try {
+        final res = await Supabase.instance.client
+            .from('profiles')
+            .select('id, full_name')
+            .eq('role', 'faculty');
+        if (mounted) {
+          setState(() {
+            _facultyOptions = List<Map<String, dynamic>>.from(res as List);
+          });
+        }
+      } catch (_) {}
     }
   }
 
@@ -94,7 +126,7 @@ class _EventCreateScreenState extends ConsumerState<EventCreateScreen> {
     }
 
     setState(() => _submitting = true);
-    final data = {
+    final Map<String, dynamic> data = {
       'title': _titleController.text,
       'description': _descriptionController.text,
       'event_type': _selectedType,
@@ -112,6 +144,10 @@ class _EventCreateScreenState extends ConsumerState<EventCreateScreen> {
       'time': '',
       'created_by_name': 'Organizer',
     };
+
+    if (_userRole == UserRole.admin && _selectedFacultyInChargeId != null) {
+      data['faculty_in_charge_id'] = _selectedFacultyInChargeId;
+    }
 
     try {
       if (widget.eventToEdit != null) {
@@ -200,6 +236,14 @@ class _EventCreateScreenState extends ConsumerState<EventCreateScreen> {
                               final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
                               if (file != null) {
                                 final bytes = await file.readAsBytes();
+                                if (bytes.length > 5 * 1024 * 1024) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Banner image size must be less than 5 MB.')),
+                                    );
+                                  }
+                                  return;
+                                }
                                 setState(() {
                                   _bannerBytes = bytes;
                                   _bannerName = file.name;
@@ -257,6 +301,25 @@ class _EventCreateScreenState extends ConsumerState<EventCreateScreen> {
                     maxLines: 3,
                     validator: (val) => val == null || val.isEmpty ? 'Required' : null,
                   ),
+                  if (_userRole == UserRole.admin && _facultyOptions.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedFacultyInChargeId,
+                      decoration: const InputDecoration(labelText: 'Faculty In Charge'),
+                      items: _facultyOptions.map((f) {
+                        return DropdownMenuItem<String>(
+                          value: f['id'].toString(),
+                          child: Text(f['full_name']?.toString() ?? 'Faculty'),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedFacultyInChargeId = val;
+                        });
+                      },
+                      validator: (val) => val == null ? 'Faculty In Charge is required' : null,
+                    ),
+                  ],
                 ],
               ),
             ),

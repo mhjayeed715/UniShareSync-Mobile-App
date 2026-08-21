@@ -16,10 +16,13 @@ class TaskDetailSheet extends ConsumerStatefulWidget {
 class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   final TextEditingController _commentController = TextEditingController();
   final TextEditingController _checklistController = TextEditingController();
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _descController = TextEditingController();
   
   KanbanTask? _task;
   List<KanbanColumn> _columns = [];
   bool _isLoading = true;
+  bool _isEditing = false;
 
   @override
   void initState() {
@@ -31,6 +34,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   void dispose() {
     _commentController.dispose();
     _checklistController.dispose();
+    _titleController.dispose();
+    _descController.dispose();
     super.dispose();
   }
 
@@ -50,13 +55,77 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     }
   }
 
+  Future<void> _saveTaskDetails() async {
+    final title = _titleController.text.trim();
+    if (title.isEmpty) return;
+    
+    setState(() => _isLoading = true);
+    try {
+      await ref.read(kanbanServiceProvider).updateTaskDetails(
+        taskId: _task!.id,
+        title: title,
+        description: _descController.text.trim(),
+        priority: _task!.priority,
+        dueDate: _task!.dueDate,
+        projectId: widget.projectId,
+      );
+      setState(() => _isEditing = false);
+      await _loadTaskDetails();
+    } catch (_) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _confirmDeleteTask(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Task'),
+        content: const Text('Are you sure you want to delete this task? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            onPressed: () => Navigator.pop(ctx),
+          ),
+          TextButton(
+            child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+            onPressed: () async {
+              Navigator.pop(ctx); // Close dialog
+              setState(() => _isLoading = true);
+              try {
+                await ref.read(kanbanServiceProvider).deleteTask(_task!.id, widget.projectId);
+                if (mounted) {
+                  Navigator.pop(context); // Close sheet
+                }
+              } catch (_) {
+                if (mounted) {
+                  setState(() => _isLoading = false);
+                }
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    final kanbanState = ref.watch(kanbanBoardProvider(widget.projectId));
+    
+    // Find task from provider first for real-time reactivity
+    KanbanTask? activeTask;
+    try {
+      activeTask = kanbanState.tasks.firstWhere((t) => t.id == widget.taskId);
+    } catch (_) {
+      activeTask = _task;
+    }
+
+    if (_isLoading && activeTask == null) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_task == null) {
+    if (activeTask == null) {
       return const Center(child: Text('Task details not found.', style: TextStyle(color: Color(0xFF0F172A))));
     }
 
@@ -72,20 +141,76 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Title
-            Text(
-              _task!.title,
-              style: const TextStyle(color: Color(0xFF0F172A), fontFamily: 'Outfit', fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            
-            // Description
-            if (_task!.description != null && _task!.description!.isNotEmpty) ...[
-              Text(
-                _task!.description!,
+            if (_isEditing) ...[
+              TextField(
+                controller: _titleController,
+                style: const TextStyle(color: Color(0xFF0F172A), fontFamily: 'Outfit', fontSize: 20, fontWeight: FontWeight.bold),
+                decoration: const InputDecoration(
+                  labelText: 'Task Title',
+                  labelStyle: TextStyle(color: Colors.grey),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.black12)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _descController,
                 style: const TextStyle(color: Color(0xFF475569), fontSize: 14),
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  labelStyle: TextStyle(color: Colors.grey),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.black12)),
+                ),
+                maxLines: 3,
               ),
               const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => setState(() => _isEditing = false),
+                    child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+                    onPressed: _saveTaskDetails,
+                    child: const Text('Save', style: TextStyle(color: Colors.white)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ] else ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      activeTask.title,
+                      style: const TextStyle(color: Color(0xFF0F172A), fontFamily: 'Outfit', fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit, color: Colors.blueAccent),
+                    onPressed: () {
+                      _titleController.text = activeTask!.title;
+                      _descController.text = activeTask.description ?? '';
+                      setState(() => _isEditing = true);
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                    onPressed: () => _confirmDeleteTask(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (activeTask.description != null && activeTask.description!.isNotEmpty) ...[
+                Text(
+                  activeTask.description!,
+                  style: const TextStyle(color: Color(0xFF475569), fontSize: 14),
+                ),
+                const SizedBox(height: 16),
+              ],
             ],
 
             // Status & Priority Dropdowns
@@ -101,7 +226,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                       ),
                       const SizedBox(height: 4),
                       DropdownButton<String>(
-                        value: _task!.columnId,
+                        value: activeTask.columnId,
                         isExpanded: true,
                         style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w600, fontSize: 14),
                         underline: const SizedBox(),
@@ -112,11 +237,11 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                           );
                         }).toList(),
                         onChanged: (newColId) async {
-                          if (newColId != null && newColId != _task!.columnId) {
+                          if (newColId != null && newColId != activeTask!.columnId) {
                             final tasksInNewCol = (await ref.read(kanbanServiceProvider).fetchTasks(widget.projectId)).where((t) => t.columnId == newColId).toList();
                             final newPos = tasksInNewCol.isEmpty ? 1.0 : tasksInNewCol.last.position + 1.0;
                             await ref.read(kanbanServiceProvider).updateTaskPosition(
-                              taskId: _task!.id,
+                              taskId: activeTask.id,
                               columnId: newColId,
                               position: newPos,
                               projectId: widget.projectId,
@@ -139,7 +264,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                       ),
                       const SizedBox(height: 4),
                       DropdownButton<TaskPriority>(
-                        value: _task!.priority,
+                        value: activeTask.priority,
                         isExpanded: true,
                         style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w600, fontSize: 14),
                         underline: const SizedBox(),
@@ -150,13 +275,13 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                           );
                         }).toList(),
                         onChanged: (newPriority) async {
-                          if (newPriority != null && newPriority != _task!.priority) {
+                          if (newPriority != null && newPriority != activeTask!.priority) {
                             await ref.read(kanbanServiceProvider).updateTaskDetails(
-                              taskId: _task!.id,
-                              title: _task!.title,
-                              description: _task!.description,
+                              taskId: activeTask.id,
+                              title: activeTask.title,
+                              description: activeTask.description,
                               priority: newPriority,
-                              dueDate: _task!.dueDate,
+                              dueDate: activeTask.dueDate,
                               projectId: widget.projectId,
                             );
                             _loadTaskDetails();
@@ -172,22 +297,22 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
 
             // Checklist Section
             _buildSectionHeader('Checklist'),
-            _buildChecklistBuilder(),
+            _buildChecklistBuilder(activeTask),
             const SizedBox(height: 20),
 
             // Comments Board
             _buildSectionHeader('Comments'),
-            _buildCommentsDeck(),
+            _buildCommentsDeck(activeTask),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildChecklistBuilder() {
+  Widget _buildChecklistBuilder(KanbanTask activeTask) {
     return Column(
       children: [
-        ..._task!.checklist.map((item) {
+        ...activeTask.checklist.map((item) {
           return CheckboxListTile(
             title: Text(item.text, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 14)),
             value: item.isChecked,
@@ -226,7 +351,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                   await ref.read(kanbanServiceProvider).addChecklistItem(
                         widget.taskId,
                         txt,
-                        _task!.checklist.length + 1,
+                        activeTask.checklist.length + 1,
                         widget.projectId,
                       );
                   _checklistController.clear();
@@ -242,7 +367,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
 
 
 
-  Widget _buildCommentsDeck() {
+  Widget _buildCommentsDeck(KanbanTask activeTask) {
     return Column(
       children: [
         // Add Comment
@@ -278,12 +403,12 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
           ],
         ),
         const SizedBox(height: 12),
-
+ 
         // Comments List
-        if (_task!.comments.isEmpty)
+        if (activeTask.comments.isEmpty)
           const Text('No comments posted yet.', style: TextStyle(color: Colors.black38))
         else
-          ..._task!.comments.map((comment) {
+          ...activeTask.comments.map((comment) {
             return ListTile(
               contentPadding: EdgeInsets.zero,
               leading: CircleAvatar(

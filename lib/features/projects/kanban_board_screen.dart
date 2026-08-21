@@ -13,11 +13,38 @@ class KanbanBoardScreen extends ConsumerStatefulWidget {
   ConsumerState<KanbanBoardScreen> createState() => _KanbanBoardScreenState();
 }
 
-class _KanbanBoardScreenState extends ConsumerState<KanbanBoardScreen> {
+class _KanbanBoardScreenState extends ConsumerState<KanbanBoardScreen> with TickerProviderStateMixin {
+  TabController? _tabController;
+  int _currentTabIndex = 0;
+
+  @override
+  void dispose() {
+    _tabController?.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final kanbanState = ref.watch(kanbanBoardProvider(widget.projectId));
     final notifier = ref.read(kanbanBoardProvider(widget.projectId).notifier);
+
+    // Initialize or update TabController dynamically when columns update
+    if (kanbanState.columns.isNotEmpty) {
+      final columnsCount = kanbanState.columns.length;
+      if (_tabController == null || _tabController!.length != columnsCount) {
+        final oldIndex = _tabController?.index ?? 0;
+        _tabController?.dispose();
+        final newIndex = oldIndex.clamp(0, columnsCount - 1);
+        _tabController = TabController(
+          length: columnsCount,
+          vsync: this,
+          initialIndex: newIndex,
+        );
+        _tabController!.addListener(() {
+          _currentTabIndex = _tabController!.index;
+        });
+      }
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F8FF),
@@ -70,53 +97,52 @@ class _KanbanBoardScreenState extends ConsumerState<KanbanBoardScreen> {
     final isMobile = MediaQuery.of(context).size.width < 600;
 
     if (isMobile) {
-      return DefaultTabController(
-        length: state.columns.length,
-        child: Column(
-          children: [
-            TabBar(
-              isScrollable: true,
-              labelColor: const Color(0xFFF97316),
-              unselectedLabelColor: const Color(0xFF64748B),
-              indicatorColor: const Color(0xFFF97316),
-              dividerColor: Colors.transparent,
-              tabs: state.columns.map((col) {
-                final count = state.tasks.where((t) => t.columnId == col.id).length;
-                return Tab(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(col.title),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF97316).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '$count',
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                        ),
+      return Column(
+        children: [
+          TabBar(
+            controller: _tabController,
+            isScrollable: true,
+            labelColor: const Color(0xFFF97316),
+            unselectedLabelColor: const Color(0xFF64748B),
+            indicatorColor: const Color(0xFFF97316),
+            dividerColor: Colors.transparent,
+            tabs: state.columns.map((col) {
+              final count = state.tasks.where((t) => t.columnId == col.id).length;
+              return Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(col.title),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF97316).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                    ],
-                  ),
+                      child: Text(
+                        '$count',
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: state.columns.map((col) {
+                final colTasks = state.tasks.where((t) => t.columnId == col.id).toList();
+                return Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: _buildColumnLane(col, colTasks, notifier, width: null),
                 );
               }).toList(),
             ),
-            Expanded(
-              child: TabBarView(
-                children: state.columns.map((col) {
-                  final colTasks = state.tasks.where((t) => t.columnId == col.id).toList();
-                  return Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: _buildColumnLane(col, colTasks, notifier, width: null),
-                  );
-                }).toList(),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 

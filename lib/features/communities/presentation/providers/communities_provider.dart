@@ -17,7 +17,9 @@ class CommunitiesNotifier extends StateNotifier<AsyncValue<List<CommunityModel>>
     String? joinType,
     int? activityScoreMin,
   }) async {
-    state = const AsyncValue.loading();
+    if (!state.hasValue) {
+      state = const AsyncValue.loading();
+    }
     try {
       final list = await _repository.getCommunities(
         search: search,

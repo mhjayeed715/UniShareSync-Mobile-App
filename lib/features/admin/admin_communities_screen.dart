@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../communities/presentation/providers/communities_provider.dart';
+import '../communities/presentation/screens/community_detail_screen.dart';
+import '../communities/presentation/screens/community_create_edit_screen.dart';
 
 class AdminCommunitiesScreen extends ConsumerStatefulWidget {
   const AdminCommunitiesScreen({super.key});
@@ -27,76 +29,42 @@ class _AdminCommunitiesScreenState extends ConsumerState<AdminCommunitiesScreen>
   }
 
   void _onCreateCommunity() {
-    final nameCtrl = TextEditingController();
-    final taglineCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    final feeCtrl = TextEditingController();
-    final paymentInstCtrl = TextEditingController();
-    bool isPaid = false;
-    
-    showDialog(
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const CommunityCreateEditScreen()),
+    ).then((_) {
+      ref.read(communitiesProvider.notifier).fetchCommunities(search: _searchController.text);
+    });
+  }
+
+  Future<void> _deleteCommunity(String communityId, String communityName) async {
+    final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Create Community'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Community Name')),
-                TextField(controller: taglineCtrl, decoration: const InputDecoration(labelText: 'Tagline')),
-                TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description'), maxLines: 3),
-                const SizedBox(height: 12),
-                CheckboxListTile(
-                  title: const Text('Requires Membership Fee?'),
-                  value: isPaid,
-                  onChanged: (val) {
-                    setState(() {
-                      isPaid = val ?? false;
-                    });
-                  },
-                ),
-                if (isPaid) ...[
-                  TextField(
-                    controller: feeCtrl,
-                    decoration: const InputDecoration(labelText: 'Membership Fee (BDT)'),
-                    keyboardType: TextInputType.number,
-                  ),
-                  TextField(
-                    controller: paymentInstCtrl,
-                    decoration: const InputDecoration(labelText: 'Payment Instructions'),
-                    maxLines: 2,
-                  ),
-                ],
-              ],
-            ),
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Community', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Text('Are you sure you want to permanently delete "$communityName"? This action cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () async {
-                if (nameCtrl.text.isNotEmpty) {
-                  final payload = {
-                    'name': nameCtrl.text,
-                    'tagline': taglineCtrl.text,
-                    'description': descCtrl.text,
-                    'type': 'academic_club',
-                    'join_type': isPaid ? 'request' : 'open',
-                    'is_paid': isPaid,
-                    'membership_fee': isPaid ? (double.tryParse(feeCtrl.text) ?? 0.0) : 0.0,
-                    'payment_instructions': isPaid ? paymentInstCtrl.text : null,
-                    'status': 'active',
-                  };
-                  await ref.read(communitiesProvider.notifier).createCommunity(payload);
-                  if (context.mounted) Navigator.pop(context);
-                }
-              },
-              child: const Text('Create'),
-            ),
-          ],
-        ),
+        ],
       ),
     );
+
+    if (confirm == true) {
+      try {
+        await ref.read(communitiesProvider.notifier).deleteCommunity(communityId);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Community deleted.')));
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
+        }
+      }
+    }
   }
 
   @override
@@ -107,7 +75,11 @@ class _AdminCommunitiesScreenState extends ConsumerState<AdminCommunitiesScreen>
       appBar: AppBar(
         title: const Text('Manage Communities'),
         actions: [
-          IconButton(icon: const Icon(Icons.add_rounded), onPressed: _onCreateCommunity),
+          IconButton(
+            icon: const Icon(Icons.add_rounded),
+            onPressed: _onCreateCommunity,
+            tooltip: 'Create Community',
+          ),
         ],
       ),
       body: Column(
@@ -138,17 +110,47 @@ class _AdminCommunitiesScreenState extends ConsumerState<AdminCommunitiesScreen>
                   itemCount: list.length,
                   itemBuilder: (context, idx) {
                     final comm = list[idx];
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundImage: comm.logoUrl != null ? NetworkImage(comm.logoUrl!) : null,
-                      ),
-                      title: Text(comm.name),
-                      subtitle: Text(comm.tagline),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
-                        onPressed: () async {
-                          // Admin deletion action
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: ListTile(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => CommunityDetailScreen(communityId: comm.id),
+                            ),
+                          ).then((_) {
+                            ref.read(communitiesProvider.notifier).fetchCommunities(search: _searchController.text);
+                          });
                         },
+                        leading: CircleAvatar(
+                          backgroundImage: comm.logoUrl != null ? NetworkImage(comm.logoUrl!) : null,
+                          child: comm.logoUrl == null ? const Icon(Icons.groups_rounded) : null,
+                        ),
+                        title: Text(comm.name),
+                        subtitle: Text(comm.tagline),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit_rounded, color: Color(0xFF4F9EFF)),
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => CommunityCreateEditScreen(existingCommunity: comm),
+                                  ),
+                                ).then((_) {
+                                  ref.read(communitiesProvider.notifier).fetchCommunities(search: _searchController.text);
+                                });
+                              },
+                              tooltip: 'Edit Community',
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                              onPressed: () => _deleteCommunity(comm.id, comm.name),
+                              tooltip: 'Delete Community',
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },

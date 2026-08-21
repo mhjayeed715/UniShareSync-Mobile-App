@@ -33,7 +33,9 @@ Future<void> main() async {
     await Firebase.initializeApp();
   }
 
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  if (!kIsWeb) {
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  }
 
   await Hive.initFlutter();
 

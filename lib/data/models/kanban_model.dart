@@ -305,6 +305,11 @@ class KanbanTask {
         ? rawAttachments.map((a) => TaskAttachment.fromMap(Map<String, dynamic>.from(a))).toList()
         : const <TaskAttachment>[];
 
+    final rawComments = map['task_comments'] as List?;
+    final comments = rawComments != null
+        ? rawComments.map((c) => TaskComment.fromMap(Map<String, dynamic>.from(c))).toList()
+        : const <TaskComment>[];
+
     return KanbanTask(
       id: map['id'] as String? ?? '',
       projectId: map['project_id'] as String? ?? '',
@@ -322,6 +327,7 @@ class KanbanTask {
       labels: labels,
       checklist: checklist,
       attachments: attachments,
+      comments: comments,
     );
   }
 }

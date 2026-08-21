@@ -1,4 +1,4 @@
-import 'dart:ui';
+﻿import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:unisharesync_mobile_app/features/auth/login_screen.dart';
 
@@ -36,7 +36,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     OnboardingSlideData(
       title: 'Collaborate & Connect',
       description:
-          'Create collaborative projects, register for campus events, and manage university club activities.',
+          'Create collaborative projects, register for campus events, and manage university community activities.',
       icon: Icons.diversity_3_rounded,
     ),
     OnboardingSlideData(

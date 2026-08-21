@@ -45,19 +45,50 @@ class CommunitiesRepository {
   }
 
   Future<void> createCommunity(Map<String, dynamic> data) async {
+    final facultyHeadId = data.remove('faculty_head_id')?.toString();
+
     final inserted = await _client.from('communities').insert(data).select('id, created_by').single();
     final communityId = inserted['id'].toString();
     final createdBy = inserted['created_by'].toString();
 
+    final targetHead = facultyHeadId ?? createdBy;
+
     await _client.from('community_members').insert({
       'community_id': communityId,
-      'user_id': createdBy,
+      'user_id': targetHead,
       'role': 'faculty_head',
     });
+
+    if (createdBy != targetHead) {
+      try {
+        await _client.from('community_members').insert({
+          'community_id': communityId,
+          'user_id': createdBy,
+          'role': 'president',
+        });
+      } catch (_) {}
+    }
   }
 
   Future<void> updateCommunity(String id, Map<String, dynamic> data) async {
+    final facultyHeadId = data.remove('faculty_head_id')?.toString();
+    
     await _client.from('communities').update(data).eq('id', id);
+
+    if (facultyHeadId != null) {
+      // Remove any existing faculty heads to prevent duplicates
+      await _client.from('community_members')
+          .delete()
+          .eq('community_id', id)
+          .eq('role', 'faculty_head');
+
+      // Add the new faculty head
+      await _client.from('community_members').upsert({
+        'community_id': id,
+        'user_id': facultyHeadId,
+        'role': 'faculty_head',
+      });
+    }
   }
 
   Future<void> deleteCommunity(String id) async {

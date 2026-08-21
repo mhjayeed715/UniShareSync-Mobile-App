@@ -139,6 +139,9 @@ class ScheduleRepository {
     final entries = (decoded['entries'] as List<dynamic>? ?? const [])
         .map((entry) => ScheduleEntry.fromJson(entry as Map<String, dynamic>))
         .toList(growable: false);
+    if (entries.isEmpty) {
+      return null;
+    }
     final timeSlots = (decoded['timeSlots'] as List<dynamic>? ?? const [])
         .map((slot) => ScheduleTimeSlot.fromJson(slot as Map<String, dynamic>))
         .toList(growable: false);
@@ -259,41 +262,79 @@ class ScheduleRepository {
     final courseTitles = <String, String>{};
     final facultyNames = <String, String>{};
 
-    var codeIndex = -1;
-    var titleIndex = -1;
-    var initialIndex = -1;
-    var nameIndex = -1;
+    // Collect all header block positions.
+    // The CCSP CSV has side-by-side semesters with repeated header rows
+    // (e.g. Code,Title,Credits,Teacher,,Code,Title,Credits,Teacher).
+    final headerBlocks = <_HeaderBlock>[];
 
-    for (final row in rows) {
-      final normalizedRow = row.map(_normalize).toList(growable: false);
-      final headerIndex = _findHeaderIndex(normalizedRow, 'course code');
-      if (headerIndex != -1) {
-        codeIndex = headerIndex;
-        titleIndex = _findHeaderIndex(normalizedRow, 'course title');
-        initialIndex = _findHeaderIndex(normalizedRow, 'faculty initial');
-        nameIndex = _findHeaderIndex(normalizedRow, 'facuty name');
-        if (nameIndex == -1) {
-          nameIndex = _findHeaderIndex(normalizedRow, 'faculty name');
+    for (var rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+      final normalizedRow =
+          rows[rowIdx].map(_normalize).toList(growable: false);
+
+      // Find ALL header blocks in this row (there may be two side-by-side).
+      for (var startCol = 0; startCol < normalizedRow.length; startCol++) {
+        final codeIdx =
+            _findHeaderIndexFrom(normalizedRow, startCol, ['course code', 'code']);
+        if (codeIdx == -1 || codeIdx < startCol) continue;
+
+        final titleIdx =
+            _findHeaderIndexFrom(normalizedRow, codeIdx + 1, ['course title', 'title']);
+        final initialIdx =
+            _findHeaderIndexFrom(normalizedRow, codeIdx + 1, ['faculty initial', 'initial']);
+        final nameIdx = _findHeaderIndexFrom(normalizedRow, codeIdx + 1, [
+          'facuty name',
+          'faculty name',
+          'assign teacher',
+          'assigned teacher',
+          'faculty',
+        ]);
+
+        headerBlocks.add(_HeaderBlock(
+          dataStartRow: rowIdx + 1,
+          codeCol: codeIdx,
+          titleCol: titleIdx,
+          initialCol: initialIdx,
+          nameCol: nameIdx,
+        ));
+
+        // Jump past this block to look for a second one in the same row.
+        startCol = codeIdx + 1;
+      }
+    }
+
+    // Parse data rows for each header block.
+    for (final block in headerBlocks) {
+      for (var rowIdx = block.dataStartRow; rowIdx < rows.length; rowIdx++) {
+        final normalizedRow =
+            rows[rowIdx].map(_normalize).toList(growable: false);
+
+        // Stop if we hit another header row or a "Total" row for this block.
+        final firstCell = _safeCell(normalizedRow, block.codeCol);
+        if (firstCell.toLowerCase() == 'code' ||
+            firstCell.toLowerCase() == 'course code' ||
+            firstCell.toLowerCase() == 'total') {
+          break;
         }
-        continue;
-      }
 
-      if (codeIndex == -1) {
-        continue;
-      }
+        // Also stop at semester label rows (e.g. "3rd Semester ...").
+        if (firstCell.contains('Semester') && firstCell.contains('Level')) {
+          break;
+        }
 
-      final code = _safeCell(normalizedRow, codeIndex);
-      final title = _safeCell(normalizedRow, titleIndex);
-      final initial = _safeCell(normalizedRow, initialIndex).toUpperCase();
-      final name = _safeCell(normalizedRow, nameIndex);
+        final code = _safeCell(normalizedRow, block.codeCol);
+        final title = _safeCell(normalizedRow, block.titleCol);
+        final initial =
+            _safeCell(normalizedRow, block.initialCol).toUpperCase();
+        final name = _safeCell(normalizedRow, block.nameCol);
 
-      if (initial.isNotEmpty && name.isNotEmpty) {
-        facultyNames.putIfAbsent(initial, () => name);
-      }
+        if (initial.isNotEmpty && name.isNotEmpty) {
+          facultyNames.putIfAbsent(initial, () => name);
+        }
 
-      if (code.isNotEmpty && title.isNotEmpty) {
-        final normalizedCode = _normalizeCourseCode(code);
-        courseTitles.putIfAbsent(normalizedCode, () => title);
+        if (code.isNotEmpty && title.isNotEmpty) {
+          final normalizedCode = _normalizeCourseCode(code);
+          courseTitles.putIfAbsent(normalizedCode, () => title);
+        }
       }
     }
 
@@ -304,8 +345,9 @@ class ScheduleRepository {
   }
 
   List<List<String>> _csvToRows(String csv) {
-    final rows = CsvToListConverter(shouldParseNumbers: false)
-        .convert(csv)
+    final normalizedCsv = csv.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    final rows = CsvToListConverter(shouldParseNumbers: false, eol: '\n')
+        .convert(normalizedCsv)
         .map(
           (row) => row
               .map((cell) => _normalize(cell?.toString() ?? ''))
@@ -377,9 +419,24 @@ class ScheduleRepository {
         .replaceAll(RegExp(r'\s+'), ' ');
   }
 
-  int _findHeaderIndex(List<String> row, String header) {
+  int _findHeaderIndex(List<String> row, Object target) {
+    final targets = target is Iterable
+        ? target.map((e) => e.toString().toLowerCase()).toSet()
+        : {target.toString().toLowerCase()};
     for (var i = 0; i < row.length; i++) {
-      if (row[i].toLowerCase() == header) {
+      if (targets.contains(row[i].toLowerCase())) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  int _findHeaderIndexFrom(List<String> row, int from, Object target) {
+    final targets = target is Iterable
+        ? target.map((e) => e.toString().toLowerCase()).toSet()
+        : {target.toString().toLowerCase()};
+    for (var i = from; i < row.length; i++) {
+      if (targets.contains(row[i].toLowerCase())) {
         return i;
       }
     }
@@ -478,6 +535,22 @@ class _CourseDirectory {
 
   final Map<String, String> courseTitles;
   final Map<String, String> facultyNames;
+}
+
+class _HeaderBlock {
+  const _HeaderBlock({
+    required this.dataStartRow,
+    required this.codeCol,
+    required this.titleCol,
+    required this.initialCol,
+    required this.nameCol,
+  });
+
+  final int dataStartRow;
+  final int codeCol;
+  final int titleCol;
+  final int initialCol;
+  final int nameCol;
 }
 
 class _SlotColumn {

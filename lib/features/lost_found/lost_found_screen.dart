@@ -700,6 +700,7 @@ class _LostFoundScreenState extends State<LostFoundScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
+        centerTitle: false,
         title: const Text(
           'Lost & Found Portal',
           style: TextStyle(

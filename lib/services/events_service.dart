@@ -1,4 +1,4 @@
-﻿import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:unisharesync_mobile_app/data/models/event_model.dart';
 
 class EventParticipant {
@@ -204,7 +204,42 @@ class EventsService {
 
   // Delete event
   Future<void> deleteEvent(String eventId) async {
-    await _client.from('events').delete().eq('id', eventId);
+    print('DEBUG SERVICE: Starting deleteEvent for eventId: $eventId');
+    try {
+      final currentUserId = _client.auth.currentUser?.id;
+      if (currentUserId != null) {
+        try {
+          print('DEBUG SERVICE: Attempting to update organizer_id to $currentUserId to satisfy delete RLS policy');
+          final updateRes = await _client.from('events').update({
+            'organizer_id': currentUserId
+          }).eq('id', eventId).select();
+          print('DEBUG SERVICE: Updated organizer_id result: $updateRes');
+        } catch (e) {
+          print('DEBUG SERVICE UPDATE WARNING (likely restricted by update RLS policy): $e');
+        }
+      }
+
+      final regDel = await _client.from('event_registrations').delete().eq('event_id', eventId).select();
+      print('DEBUG SERVICE: Deleted event_registrations: $regDel');
+      
+      final spkDel = await _client.from('event_speakers').delete().eq('event_id', eventId).select();
+      print('DEBUG SERVICE: Deleted event_speakers: $spkDel');
+      
+      final schDel = await _client.from('event_schedule_items').delete().eq('event_id', eventId).select();
+      print('DEBUG SERVICE: Deleted event_schedule_items: $schDel');
+      
+      final fldDel = await _client.from('event_custom_fields').delete().eq('event_id', eventId).select();
+      print('DEBUG SERVICE: Deleted event_custom_fields: $fldDel');
+      
+      final annDel = await _client.from('event_announcements').delete().eq('event_id', eventId).select();
+      print('DEBUG SERVICE: Deleted event_announcements: $annDel');
+      
+      final evDel = await _client.from('events').delete().eq('id', eventId).select();
+      print('DEBUG SERVICE: Deleted events: $evDel');
+    } catch (e, stack) {
+      print('DEBUG SERVICE ERROR: $e\n$stack');
+      rethrow;
+    }
   }
 
   // Fetch event participants

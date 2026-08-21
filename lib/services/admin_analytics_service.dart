@@ -71,6 +71,9 @@ class AdminAnalyticsSnapshot {
     required this.busRouteTraffic,
     required this.topEvents,
     required this.fetchedAt,
+    required this.totalCommunities,
+    required this.totalNotices,
+    required this.totalLostFound,
   });
 
   final int totalUsers;
@@ -83,6 +86,9 @@ class AdminAnalyticsSnapshot {
   final List<BusRouteTrafficStat> busRouteTraffic;
   final List<EventRegistrationStat> topEvents;
   final DateTime fetchedAt;
+  final int totalCommunities;
+  final int totalNotices;
+  final int totalLostFound;
 
   static AdminAnalyticsSnapshot get empty => AdminAnalyticsSnapshot(
         totalUsers: 0,
@@ -95,6 +101,9 @@ class AdminAnalyticsSnapshot {
         busRouteTraffic: const [],
         topEvents: const [],
         fetchedAt: DateTime.fromMillisecondsSinceEpoch(0),
+        totalCommunities: 0,
+        totalNotices: 0,
+        totalLostFound: 0,
       );
 }
 
@@ -128,6 +137,9 @@ class AdminAnalyticsService {
       _fetchBusRouteTraffic(),
       _fetchEventStats(),
       _fetchResourceSummary(),
+      _fetchTotalCommunities(),
+      _fetchTotalNotices(),
+      _fetchTotalLostFound(),
     ]);
 
     final userStats = results[0] as _UserStats;
@@ -136,6 +148,9 @@ class AdminAnalyticsService {
     final busRouteTraffic = results[3] as List<BusRouteTrafficStat>;
     final eventStats = results[4] as _EventStats;
     final resourceSummary = results[5] as _ResourceSummary;
+    final totalCommunities = results[6] as int;
+    final totalNotices = results[7] as int;
+    final totalLostFound = results[8] as int;
 
     return AdminAnalyticsSnapshot(
       totalUsers: userStats.total,
@@ -148,6 +163,9 @@ class AdminAnalyticsService {
       busRouteTraffic: busRouteTraffic,
       topEvents: eventStats.topEvents,
       fetchedAt: DateTime.now(),
+      totalCommunities: totalCommunities,
+      totalNotices: totalNotices,
+      totalLostFound: totalLostFound,
     );
   }
 
@@ -245,6 +263,33 @@ class AdminAnalyticsService {
       };
     } catch (_) {
       return const {};
+    }
+  }
+
+  Future<int> _fetchTotalCommunities() async {
+    try {
+      final rows = await _client.from('communities').select('id').timeout(const Duration(seconds: 8));
+      return rows.length;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  Future<int> _fetchTotalNotices() async {
+    try {
+      final rows = await _client.from('notices').select('id').timeout(const Duration(seconds: 8));
+      return rows.length;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  Future<int> _fetchTotalLostFound() async {
+    try {
+      final rows = await _client.from('lost_found_reports').select('id').timeout(const Duration(seconds: 8));
+      return rows.length;
+    } catch (_) {
+      return 0;
     }
   }
 

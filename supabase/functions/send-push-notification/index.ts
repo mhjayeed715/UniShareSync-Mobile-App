@@ -18,6 +18,9 @@ type ProfileRow = {
   fcm_token?: string | null;
 };
 
+// In-memory cache for Firebase OAuth2 access token across warm Edge Function invocations
+let cachedOAuthToken: { token: string; expiresAt: number } | null = null;
+
 function stringifyData(
   data: Record<string, unknown> | undefined,
   type: string,
@@ -29,7 +32,18 @@ function stringifyData(
   return result;
 }
 
-// Returns both resolved userIds and their fcm_tokens
+// Deduplicates and cleans token arrays so no device receives duplicate pushes
+function sanitizeTokens(tokens: (string | null | undefined)[]): string[] {
+  return Array.from(
+    new Set(
+      tokens
+        .filter((t): t is string => typeof t === "string" && t.trim().length > 0)
+        .map((t) => t.trim())
+    )
+  );
+}
+
+// Returns both resolved userIds and their unique fcm_tokens
 async function resolveTargets(
   body: Record<string, unknown>,
   adminClient: ReturnType<typeof createClient>,
@@ -37,10 +51,10 @@ async function resolveTargets(
   // Direct token(s) provided — no userId resolution possible
   const fcmTokens = body.fcmTokens as string[] | undefined;
   if (fcmTokens?.length) {
-    return { userIds: [], tokens: fcmTokens.filter(Boolean) };
+    return { userIds: [], tokens: sanitizeTokens(fcmTokens) };
   }
   const fcmToken = body.fcmToken as string | undefined;
-  if (fcmToken) return { userIds: [], tokens: [fcmToken] };
+  if (fcmToken) return { userIds: [], tokens: sanitizeTokens([fcmToken]) };
 
   // Resolve by userId(s)
   const userIds = body.userIds as string[] | undefined;
@@ -55,7 +69,7 @@ async function resolveTargets(
     const rows = (data ?? []) as { id: string; fcm_token?: string | null }[];
     return {
       userIds: rows.map((r) => r.id),
-      tokens: rows.map((r) => r.fcm_token).filter((t): t is string => !!t),
+      tokens: sanitizeTokens(rows.map((r) => r.fcm_token)),
     };
   }
 
@@ -80,7 +94,7 @@ async function resolveTargets(
     ? [semesterNo]
     : [];
 
-  const matched = (profiles as ProfileRow[] ?? [])
+  const matched = ((profiles as ProfileRow[]) ?? [])
     .filter((p) => p.is_active !== false)
     .filter((p) => {
       if (!semesters.length) return true;
@@ -93,7 +107,7 @@ async function resolveTargets(
 
   return {
     userIds: matched.map((p) => p.id),
-    tokens: matched.map((p) => p.fcm_token).filter((t): t is string => !!t),
+    tokens: sanitizeTokens(matched.map((p) => p.fcm_token)),
   };
 }
 
@@ -151,6 +165,21 @@ function buildTokenMessage(
         default_vibrate_timings: true,
       },
     },
+    webpush: {
+      headers: {
+        Urgency: "high",
+        TTL: "86400",
+      },
+      notification: {
+        title,
+        body,
+        icon: "/icons/Icon-192.png",
+        tag: data.type ? `${data.type}_${data.id ?? Date.now()}` : undefined,
+      },
+      fcm_options: {
+        link: "/",
+      },
+    },
     apns: {
       headers: { "apns-priority": "10" },
       payload: { aps: { sound: "default", alert: { title, body } } },
@@ -183,7 +212,7 @@ serve(async (req) => {
   }
 
   try {
-    const body = await req.json() as Record<string, unknown>;
+    const body = (await req.json()) as Record<string, unknown>;
     const { type, title, body: msgBody, data } = body as {
       type?: string;
       title: string;
@@ -209,7 +238,14 @@ serve(async (req) => {
     // Notices appear in the dedicated Notices tab — no insert needed there either.
     const skipInApp = (body.skipInApp as boolean | undefined) === true;
     if (!skipInApp && eventType !== "notice") {
-      await insertInAppNotifications(adminClient, userIds, title, msgBody, eventType, data as Record<string, unknown> | undefined);
+      await insertInAppNotifications(
+        adminClient,
+        userIds,
+        title,
+        msgBody,
+        eventType,
+        data as Record<string, unknown> | undefined,
+      );
     }
 
     if (!tokens.length) {
@@ -219,7 +255,7 @@ serve(async (req) => {
       );
     }
 
-    const accessToken = await getAccessToken(sa.client_email, sa.private_key);
+    const accessToken = await getCachedAccessToken(sa.client_email, sa.private_key);
     const projectId = sa.project_id;
     const stringData = stringifyData(data as Record<string, unknown> | undefined, eventType);
 
@@ -233,11 +269,19 @@ serve(async (req) => {
     const succeeded = results.length - failed.length;
 
     if (failed.length > 0) {
-      console.error("Some FCM sends failed:", failed.map((r) => r.status === "rejected" ? r.reason : null));
+      console.error(
+        "Some FCM sends failed:",
+        failed.map((r) => (r.status === "rejected" ? r.reason : null)),
+      );
     }
 
     return new Response(
-      JSON.stringify({ success: failed.length === 0, sent: succeeded, failed: failed.length, total: results.length }),
+      JSON.stringify({
+        success: failed.length === 0,
+        sent: succeeded,
+        failed: failed.length,
+        total: results.length,
+      }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: failed.length === results.length ? 400 : 200,
@@ -251,6 +295,17 @@ serve(async (req) => {
     );
   }
 });
+
+async function getCachedAccessToken(clientEmail: string, privateKey: string): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  if (cachedOAuthToken && cachedOAuthToken.expiresAt > now + 60) {
+    return cachedOAuthToken.token;
+  }
+  const token = await getAccessToken(clientEmail, privateKey);
+  // Cache token for 50 minutes (valid for 60 min)
+  cachedOAuthToken = { token, expiresAt: now + 3000 };
+  return token;
+}
 
 async function getAccessToken(clientEmail: string, privateKey: string): Promise<string> {
   const pemHeader = "-----BEGIN PRIVATE KEY-----";
@@ -297,3 +352,4 @@ async function getAccessToken(clientEmail: string, privateKey: string): Promise<
   if (!res.ok) throw new Error(`OAuth failed: ${JSON.stringify(tokenData)}`);
   return tokenData.access_token;
 }
+

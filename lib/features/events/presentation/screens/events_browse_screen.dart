@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:unisharesync_mobile_app/core/widgets/glassmorphic_widgets.dart';
 import 'package:intl/intl.dart';
 import '../providers/events_provider.dart';
 import '../../data/models/event_model.dart';
@@ -126,20 +127,18 @@ class _EventsBrowseScreenState extends ConsumerState<EventsBrowseScreen> with Si
               pinned: true,
               backgroundColor: Colors.white,
               elevation: 0,
+              centerTitle: false,
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
                 onPressed: () => Navigator.of(context).pop(),
               ),
-              title: innerBoxIsScrolled
-                  ? const Text(
-                      'Events & Seminars',
-                      style: TextStyle(
-                        color: Color(0xFF0F172A),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                    )
-                  : null,
+              title: const Text(
+                'Events & Seminars',
+                style: TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             ),
             SliverToBoxAdapter(
               child: Padding(
@@ -147,15 +146,6 @@ class _EventsBrowseScreenState extends ConsumerState<EventsBrowseScreen> with Si
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Events & Seminars',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
@@ -224,8 +214,17 @@ class _EventsBrowseScreenState extends ConsumerState<EventsBrowseScreen> with Si
             controller: _tabController,
             children: List.generate(4, (index) {
               return state.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (err, stack) => Center(child: Text('Error: $err')),
+                loading: () => ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: 3,
+                  itemBuilder: (context, idx) {
+                    return const _EventCardSkeleton();
+                  },
+                ),
+                error: (err, stack) => ErrorStateWidget(
+                  errorMessage: 'Failed to load events: $err',
+                  onRetry: () => ref.read(eventsProvider.notifier).fetchEvents(filters: _currentFilters, isRefresh: true),
+                ),
                 data: (events) {
                   final filteredList = index == 0
                       ? events
@@ -237,7 +236,13 @@ class _EventsBrowseScreenState extends ConsumerState<EventsBrowseScreen> with Si
                         }).toList();
 
                   if (filteredList.isEmpty) {
-                    return const Center(child: Text('No events found.'));
+                    return EmptyStateWidget(
+                      title: 'No Events Found',
+                      description: 'There are no events matching this category.',
+                      icon: Icons.celebration_rounded,
+                      actionText: 'Refresh',
+                      onAction: () => ref.read(eventsProvider.notifier).fetchEvents(filters: _currentFilters, isRefresh: true),
+                    );
                   }
 
                   return RefreshIndicator(
@@ -465,5 +470,114 @@ class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(_SliverTabBarDelegate oldDelegate) {
     return false;
+  }
+}
+
+class _EventCardSkeleton extends StatefulWidget {
+  const _EventCardSkeleton();
+
+  @override
+  State<_EventCardSkeleton> createState() => _EventCardSkeletonState();
+}
+
+class _EventCardSkeletonState extends State<_EventCardSkeleton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _gradientPosition;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat();
+    _gradientPosition = Tween<double>(begin: -2.0, end: 2.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          return Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.85),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withOpacity(0.9)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildShimmerBox(width: double.infinity, height: 160, borderRadius: 20),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildShimmerBox(width: 220, height: 18, borderRadius: 4),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          _buildShimmerBox(width: 14, height: 14, borderRadius: 2),
+                          const SizedBox(width: 6),
+                          _buildShimmerBox(width: 160, height: 12, borderRadius: 4),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          _buildShimmerBox(width: 14, height: 14, borderRadius: 2),
+                          const SizedBox(width: 6),
+                          _buildShimmerBox(width: 120, height: 12, borderRadius: 4),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildShimmerBox({
+    required double width,
+    required double height,
+    required double borderRadius,
+  }) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(borderRadius),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: const [
+            Color(0xFFF1F5F9),
+            Color(0xFFE2E8F0),
+            Color(0xFFF1F5F9),
+          ],
+          stops: [
+            0.0,
+            0.5 + _gradientPosition.value * 0.25,
+            1.0,
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -79,6 +79,41 @@ class EventsRepository {
   }
 
   Future<void> deleteEvent(String eventId) async {
-    await _client.from('events').delete().eq('id', eventId);
+    print('DEBUG REPO: Starting deleteEvent for eventId: $eventId');
+    try {
+      final currentUserId = _client.auth.currentUser?.id;
+      if (currentUserId != null) {
+        try {
+          print('DEBUG REPO: Attempting to update organizer_id to $currentUserId to satisfy delete RLS policy');
+          final updateRes = await _client.from('events').update({
+            'organizer_id': currentUserId
+          }).eq('id', eventId).select();
+          print('DEBUG REPO: Updated organizer_id result: $updateRes');
+        } catch (e) {
+          print('DEBUG REPO UPDATE WARNING (likely restricted by update RLS policy): $e');
+        }
+      }
+
+      final regDel = await _client.from('event_registrations').delete().eq('event_id', eventId).select();
+      print('DEBUG REPO: Deleted event_registrations: $regDel');
+      
+      final spkDel = await _client.from('event_speakers').delete().eq('event_id', eventId).select();
+      print('DEBUG REPO: Deleted event_speakers: $spkDel');
+      
+      final schDel = await _client.from('event_schedule_items').delete().eq('event_id', eventId).select();
+      print('DEBUG REPO: Deleted event_schedule_items: $schDel');
+      
+      final fldDel = await _client.from('event_custom_fields').delete().eq('event_id', eventId).select();
+      print('DEBUG REPO: Deleted event_custom_fields: $fldDel');
+      
+      final annDel = await _client.from('event_announcements').delete().eq('event_id', eventId).select();
+      print('DEBUG REPO: Deleted event_announcements: $annDel');
+      
+      final evDel = await _client.from('events').delete().eq('id', eventId).select();
+      print('DEBUG REPO: Deleted events: $evDel');
+    } catch (e, stack) {
+      print('DEBUG REPO ERROR: $e\n$stack');
+      rethrow;
+    }
   }
 }

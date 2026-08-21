@@ -77,6 +77,10 @@ class _AdminNoticeBoardScreenState extends State<AdminNoticeBoardScreen> {
       if (result != null && result.files.isNotEmpty) {
         final file = result.files.first;
         if (file.bytes != null) {
+          if (file.bytes!.length > 5 * 1024 * 1024) {
+            _snack('Attachment file size must be less than 5 MB.');
+            return;
+          }
           setState(() {
             _pickedBytes = file.bytes;
             _pickedFileName = file.name;
