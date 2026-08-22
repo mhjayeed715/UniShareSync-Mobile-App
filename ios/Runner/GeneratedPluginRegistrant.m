@@ -66,6 +66,12 @@
 @import image_picker_ios;
 #endif
 
+#if __has_include(<native_glass_navbar/NativeLiquidTabBarPlugin.h>)
+#import <native_glass_navbar/NativeLiquidTabBarPlugin.h>
+#else
+@import native_glass_navbar;
+#endif
+
 #if __has_include(<package_info_plus/FPPPackageInfoPlusPlugin.h>)
 #import <package_info_plus/FPPPackageInfoPlusPlugin.h>
 #else
@@ -127,6 +133,7 @@
   [FlutterSound registerWithRegistrar:[registry registrarForPlugin:@"FlutterSound"]];
   [GeolocatorPlugin registerWithRegistrar:[registry registrarForPlugin:@"GeolocatorPlugin"]];
   [FLTImagePickerPlugin registerWithRegistrar:[registry registrarForPlugin:@"FLTImagePickerPlugin"]];
+  [NativeLiquidTabBarPlugin registerWithRegistrar:[registry registrarForPlugin:@"NativeLiquidTabBarPlugin"]];
   [FPPPackageInfoPlusPlugin registerWithRegistrar:[registry registrarForPlugin:@"FPPPackageInfoPlusPlugin"]];
   [PasskeysPlugin registerWithRegistrar:[registry registrarForPlugin:@"PasskeysPlugin"]];
   [PathProviderPlugin registerWithRegistrar:[registry registrarForPlugin:@"PathProviderPlugin"]];

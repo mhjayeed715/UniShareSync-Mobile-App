@@ -68,12 +68,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
-  bool _isUniversityEmail(String email) {
+  bool _isAllowedEmail(String email) {
     final value = email.trim().toLowerCase();
-    final pattern = RegExp(
-      r'^[a-z0-9]+(?:\.[a-z0-9]+)*@[a-z][a-z0-9-]*\.ac\.bd$',
+    final universityPattern = RegExp(
+      r'^[a-z0-9._%+-]+@[a-z0-9.-]*\.ac\.bd$',
     );
-    return pattern.hasMatch(value);
+    final gmailPattern = RegExp(
+      r'^[a-z0-9._%+-]+@gmail\.com$',
+    );
+    return universityPattern.hasMatch(value) || gmailPattern.hasMatch(value);
   }
 
   String? _validateStrongPassword(String? value) {
@@ -385,8 +388,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   if (email.isEmpty) {
                                     return 'Email is required';
                                   }
-                                  if (!_isUniversityEmail(email)) {
-                                    return 'Use: studentname(.id optional)@universityname.ac.bd';
+                                  if (!_isAllowedEmail(email)) {
+                                    return 'Enter a valid university email (@*.ac.bd) or Gmail (@gmail.com)';
                                   }
                                   return null;
                                 },

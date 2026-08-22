@@ -542,7 +542,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Enter your university email and we will send a 6-digit verification code.',
+          'Enter your registered email address and we will send a 6-digit verification code.',
           style: TextStyle(
             fontSize: 13,
             height: 1.45,
@@ -553,7 +553,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
         const SizedBox(height: 18),
         _GlassInput(
           controller: _emailController,
-          hintText: 'yourname@university.edu',
+          hintText: 'yourname@email.com',
           prefixIcon: Icons.alternate_email_rounded,
           keyboardType: TextInputType.emailAddress,
           enabled: true,

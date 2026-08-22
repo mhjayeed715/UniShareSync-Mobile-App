@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/models/event_model.dart';
@@ -455,6 +456,79 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                     style: TextStyle(fontStyle: FontStyle.italic, fontSize: 13, color: Colors.grey),
                                   ),
                                 ],
+                              ],
+                              if (_userRegistration!.registrationStatus == 'confirmed' ||
+                                  _userRegistration!.registrationStatus == 'attended') ...[
+                                const SizedBox(height: 14),
+                                const Divider(),
+                                const SizedBox(height: 8),
+                                const Center(
+                                  child: Text(
+                                    'EVENT E-TICKET',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      letterSpacing: 1.2,
+                                      color: Color(0xFF2B5B94),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(color: Colors.grey.shade300),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.04),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: QrImageView(
+                                      data: 'UNISHARESYNC_EVENT:${widget.eventId}:${_userRegistration!.id}',
+                                      version: QrVersions.auto,
+                                      size: 140.0,
+                                      backgroundColor: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                const Center(
+                                  child: Text(
+                                    'Show this QR code at the entrance for fast check-in',
+                                    style: TextStyle(fontSize: 11.5, color: Colors.grey),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ],
+                              if (_userRegistration!.certificateIssued && _userRegistration!.certificateUrl != null) ...[
+                                const SizedBox(height: 14),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () async {
+                                      final uri = Uri.tryParse(_userRegistration!.certificateUrl!);
+                                      if (uri != null && await canLaunchUrl(uri)) {
+                                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                      }
+                                    },
+                                    icon: const Icon(Icons.workspace_premium_rounded, color: Colors.white),
+                                    label: const Text(
+                                      'View / Download Certificate',
+                                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF4F9EFF),
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                  ),
+                                ),
                               ],
                             ],
                           ),

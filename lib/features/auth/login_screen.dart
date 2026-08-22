@@ -361,7 +361,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                 const SizedBox(height: 8),
                                 Center(
                                   child: Text(
-                                    'Sign in with your university email',
+                                    'Sign in with your university or Gmail account',
                                     style: TextStyle(
                                       color: Colors.grey.shade600,
                                       fontWeight: FontWeight.w500,
@@ -381,7 +381,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                     borderRadius: BorderRadius.circular(14),
                                     border: Border.all(
                                       color: const Color(0xFF4F9EFF)
-                                          .withOpacity(0.2),
+                                        .withOpacity(0.2),
                                     ),
                                   ),
                                   child: Row(
@@ -396,7 +396,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
-                                          'Use your registered university email.',
+                                          'Use your registered university email or Gmail.',
                                           style: TextStyle(
                                             fontSize: 12,
                                             height: 1.35,
