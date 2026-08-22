@@ -257,15 +257,28 @@ class NoticeService {
         .select()
         .single();
 
+    final insertedNoticeId = inserted['id']?.toString();
+
     await _sendPushNotification(
       title: title,
       body: content.length > 100 ? '${content.substring(0, 100)}…' : content,
       priority: priority,
+      noticeId: insertedNoticeId,
       targetRoles: targetRoles,
       targetSemesters: targetSemesters,
     );
 
     return NoticeModel.fromMap(Map<String, dynamic>.from(inserted));
+  }
+
+  Future<NoticeModel?> getNoticeById(String id) async {
+    try {
+      final res = await _client.from('notices').select().eq('id', id).maybeSingle();
+      if (res == null) return null;
+      return NoticeModel.fromMap(Map<String, dynamic>.from(res));
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> updateNotice({
@@ -299,6 +312,7 @@ class NoticeService {
     required String title,
     required String body,
     required NoticePriority priority,
+    String? noticeId,
     List<String> targetRoles = const ['student', 'faculty', 'admin'],
     List<int> targetSemesters = const [],
   }) async {
@@ -311,7 +325,10 @@ class NoticeService {
           'body': body,
           'targetRoles': targetRoles,
           'targetSemesters': targetSemesters,
-          'data': {'priority': priority.name},
+          'data': {
+            'priority': priority.name,
+            if (noticeId != null) 'notice_id': noticeId,
+          },
         },
       );
     } catch (e) {

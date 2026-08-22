@@ -240,10 +240,11 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                         }).toList(),
                         onChanged: (newColId) async {
                           if (newColId != null && newColId != task.columnId) {
+                            final currentTaskId = task.id;
                             final tasksInNewCol = (await ref.read(kanbanServiceProvider).fetchTasks(widget.projectId)).where((t) => t.columnId == newColId).toList();
                             final newPos = tasksInNewCol.isEmpty ? 1.0 : tasksInNewCol.last.position + 1.0;
                             await ref.read(kanbanServiceProvider).updateTaskPosition(
-                              taskId: task.id,
+                              taskId: currentTaskId,
                               columnId: newColId,
                               position: newPos,
                               projectId: widget.projectId,

@@ -9,6 +9,7 @@ import 'package:native_glass_navbar/native_glass_navbar.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:unisharesync_mobile_app/data/models/dashboard_feed_item.dart';
 import 'package:unisharesync_mobile_app/data/models/profile_model.dart';
@@ -2045,7 +2046,7 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _HamburgerMenuScreen extends StatelessWidget {
+class _HamburgerMenuScreen extends StatefulWidget {
   const _HamburgerMenuScreen({
     required this.profile,
     required this.role,
@@ -2056,17 +2057,101 @@ class _HamburgerMenuScreen extends StatelessWidget {
   final UserRole role;
   final bool isLocalAdmin;
 
+  @override
+  State<_HamburgerMenuScreen> createState() => _HamburgerMenuScreenState();
+}
+
+class _HamburgerMenuScreenState extends State<_HamburgerMenuScreen> {
+  String? _preferredGroup;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadGroupPreference();
+  }
+
+  Future<void> _loadGroupPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _preferredGroup = prefs.getString('preferred_routine_group');
+      });
+    }
+  }
+
   void _go(BuildContext context, _MenuDestination d) =>
       Navigator.of(context).pop(d);
 
+  Future<void> _changeRoutineGroup() async {
+    final controller = TextEditingController(text: _preferredGroup ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Default Routine Section / Group', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Set your group/section (e.g. 10A, 10B, 9A, A, B) to load your routine automatically by default.',
+              style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                hintText: 'e.g. 10A or A',
+                filled: true,
+                fillColor: const Color(0xFFF1F5F9),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim().toUpperCase()),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4F9EFF),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null) {
+      final prefs = await SharedPreferences.getInstance();
+      if (result.isEmpty) {
+        await prefs.remove('preferred_routine_group');
+      } else {
+        await prefs.setString('preferred_routine_group', result);
+      }
+      if (mounted) {
+        setState(() {
+          _preferredGroup = result.isEmpty ? null : result;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Default routine section set to ${result.isEmpty ? "None" : result}')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final displayName = profile?.fullName ??
-        (isLocalAdmin ? 'Fixed Credential Admin' : 'Campus User');
-    final email = profile?.email ?? (isLocalAdmin ? 'Local admin mode' : '');
-    final roleLabel = isLocalAdmin ? 'Admin' : role.displayName;
+    final displayName = widget.profile?.fullName ??
+        (widget.isLocalAdmin ? 'Fixed Credential Admin' : 'Campus User');
+    final email = widget.profile?.email ?? (widget.isLocalAdmin ? 'Local admin mode' : '');
+    final roleLabel = widget.isLocalAdmin ? 'Admin' : widget.role.displayName;
 
-    final roleColor = switch (role) {
+    final roleColor = switch (widget.role) {
       UserRole.student => const Color(0xFF2563EB),
       UserRole.faculty => const Color(0xFF0F766E),
       UserRole.admin => const Color(0xFFEA580C),
@@ -2125,10 +2210,10 @@ class _HamburgerMenuScreen extends StatelessWidget {
                       CircleAvatar(
                         radius: 28,
                         backgroundColor: roleColor.withOpacity(0.15),
-                        backgroundImage: profile?.avatarUrl != null
-                            ? NetworkImage(profile!.avatarUrl!)
+                        backgroundImage: widget.profile?.avatarUrl != null
+                            ? NetworkImage(widget.profile!.avatarUrl!)
                             : null,
-                        child: profile?.avatarUrl == null
+                        child: widget.profile?.avatarUrl == null
                             ? Text(
                                 displayName.isNotEmpty
                                     ? displayName[0].toUpperCase()
@@ -2302,6 +2387,21 @@ class _HamburgerMenuScreen extends StatelessWidget {
                       onTap: () =>
                           _go(context, _MenuDestination.notificationCenter),
                     ),
+                    if (widget.role == UserRole.student)
+                      _SettingsRow(
+                        icon: Icons.tune_rounded,
+                        iconColor: const Color(0xFF0EA5E9),
+                        label: 'Routine Section / Group',
+                        trailing: Text(
+                          _preferredGroup ?? 'Not set',
+                          style: const TextStyle(
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                        onTap: _changeRoutineGroup,
+                      ),
                     _SettingsRow(
                       icon: Icons.rate_review_outlined,
                       iconColor: _DashboardPalette.feedbackIndigo,

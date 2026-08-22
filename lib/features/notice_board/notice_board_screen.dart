@@ -306,13 +306,63 @@ class _NoticeSkeletonCard extends StatelessWidget {
 
 // ── Detail screen ─────────────────────────────────────────────────────────────
 
-class NoticeDetailScreen extends StatelessWidget {
-  const NoticeDetailScreen({super.key, required this.notice});
+class NoticeDetailScreen extends StatefulWidget {
+  const NoticeDetailScreen({
+    super.key,
+    this.notice,
+    this.noticeId,
+  }) : assert(notice != null || noticeId != null, 'Either notice or noticeId must be provided');
 
-  final NoticeModel notice;
+  final NoticeModel? notice;
+  final String? noticeId;
+
+  @override
+  State<NoticeDetailScreen> createState() => _NoticeDetailScreenState();
+}
+
+class _NoticeDetailScreenState extends State<NoticeDetailScreen> {
+  NoticeModel? _notice;
+  bool _isLoading = false;
+  String? _error;
 
   static const _amber = Color(0xFFF59E0B);
   static const _bg = Color(0xFFF4F8FF);
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.notice != null) {
+      _notice = widget.notice;
+    } else if (widget.noticeId != null) {
+      _loadNotice(widget.noticeId!);
+    }
+  }
+
+  Future<void> _loadNotice(String id) async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final item = await NoticeService().getNoticeById(id);
+      if (mounted) {
+        setState(() {
+          _notice = item;
+          _isLoading = false;
+          if (item == null) {
+            _error = 'Notice not found or removed.';
+          }
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = 'Failed to load notice details.';
+        });
+      }
+    }
+  }
 
   Color _priorityColor(NoticePriority p) => switch (p) {
         NoticePriority.urgent => const Color(0xFFEF4444),
@@ -322,6 +372,51 @@ class NoticeDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: _bg,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text('Notice Detail', style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w800)),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_error != null || _notice == null) {
+      return Scaffold(
+        backgroundColor: _bg,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text('Notice Detail', style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w800)),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline_rounded, size: 48, color: Colors.redAccent),
+                const SizedBox(height: 12),
+                Text(_error ?? 'Notice unavailable', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: () => Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (_) => const NoticeBoardScreen()),
+                  ),
+                  icon: const Icon(Icons.campaign_rounded),
+                  label: const Text('Open Notice Board'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final notice = _notice!;
     final pColor = _priorityColor(notice.priority);
 
     return Scaffold(

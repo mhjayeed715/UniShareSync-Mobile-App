@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:unisharesync_mobile_app/services/profile_service.dart';
 import 'package:unisharesync_mobile_app/services/schedule_service.dart';
 
 import 'schedule_models.dart';
@@ -156,6 +157,8 @@ class _ClassSchedulerScreenState extends State<ClassSchedulerScreen> {
         _errorMessage = null;
         _initFilters();
       });
+
+      await _applyDefaultStudentFilters();
     } catch (error) {
       if (!mounted) {
         return;
@@ -166,6 +169,40 @@ class _ClassSchedulerScreenState extends State<ClassSchedulerScreen> {
         _errorMessage = '$error';
       });
     }
+  }
+
+  Future<void> _applyDefaultStudentFilters() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final preferredGroup = prefs.getString('preferred_routine_group');
+
+      final profile = await ProfileService().getCurrentProfile();
+      int? studentSemester;
+      if (profile?.semester != null) {
+        final digits = profile!.semester!.replaceAll(RegExp(r'[^0-9]'), '');
+        studentSemester = int.tryParse(digits);
+      }
+
+      final semesters = _availableSemesters();
+      if (studentSemester != null && semesters.contains(studentSemester)) {
+        _selectedSemester = studentSemester;
+      }
+
+      final groups = _availableGroupsForSemester(_selectedSemester);
+      if (preferredGroup != null && preferredGroup.isNotEmpty) {
+        if (groups.contains(preferredGroup)) {
+          _selectedGroup = preferredGroup;
+        } else if (groups.any((g) => g.toLowerCase().trim() == preferredGroup.toLowerCase().trim())) {
+          _selectedGroup = groups.firstWhere((g) => g.toLowerCase().trim() == preferredGroup.toLowerCase().trim());
+        } else if (groups.any((g) => g.toLowerCase().contains(preferredGroup.toLowerCase()))) {
+          _selectedGroup = groups.firstWhere((g) => g.toLowerCase().contains(preferredGroup.toLowerCase()));
+        }
+      }
+
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (_) {}
   }
 
   void _initFilters() {

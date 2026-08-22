@@ -1,12 +1,15 @@
+import 'dart:convert';
 import 'dart:io' show Platform;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:unisharesync_mobile_app/features/notice_board/notice_board_screen.dart';
+import 'package:unisharesync_mobile_app/main.dart';
 
 const String _channelId = 'campus_notices_channel';
 const String _channelName = 'Campus Notices';
@@ -23,8 +26,9 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     final title = message.data['title']?.toString();
     final body = message.data['body']?.toString();
     if (title == null || body == null || body.isEmpty) return;
+    final payloadJson = jsonEncode(message.data);
     await _showLocalNotification(
-        title, body, message.data['type']?.toString(), message.hashCode);
+        title, body, payloadJson, message.hashCode);
   }
 }
 
@@ -114,6 +118,9 @@ class PushNotificationService {
         });
 
         FirebaseMessaging.onMessage.listen(_handleForeground);
+        FirebaseMessaging.onMessageOpenedApp.listen((message) {
+          _handleNotificationRouting(message.data);
+        });
       } catch (e) {
         debugPrint('[FCM Web] init error: $e');
       }
@@ -155,7 +162,18 @@ class PushNotificationService {
       const InitializationSettings(
         android: AndroidInitializationSettings(_notifIcon),
       ),
-      onDidReceiveNotificationResponse: (details) {},
+      onDidReceiveNotificationResponse: (details) {
+        if (details.payload != null && details.payload!.isNotEmpty) {
+          try {
+            final parsed = jsonDecode(details.payload!);
+            if (parsed is Map<String, dynamic>) {
+              _handleNotificationRouting(parsed);
+              return;
+            }
+          } catch (_) {}
+          _handleNotificationRouting({'type': details.payload});
+        }
+      },
     );
 
     // Save token for passed userId
@@ -185,6 +203,42 @@ class PushNotificationService {
     });
 
     FirebaseMessaging.onMessage.listen(_handleForeground);
+
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      _handleNotificationRouting(message.data);
+    });
+
+    _messaging.getInitialMessage().then((RemoteMessage? message) {
+      if (message != null) {
+        Future.delayed(const Duration(milliseconds: 700), () {
+          _handleNotificationRouting(message.data);
+        });
+      }
+    });
+  }
+
+  void _handleNotificationRouting(Map<String, dynamic> data) {
+    final type = data['type']?.toString().toLowerCase();
+    final noticeId = data['notice_id']?.toString() ?? data['id']?.toString();
+
+    final navState = appNavigatorKey.currentState;
+    if (navState == null) return;
+
+    if (type == 'notice' || noticeId != null) {
+      if (noticeId != null && noticeId.isNotEmpty && noticeId != 'notice') {
+        navState.push(
+          MaterialPageRoute(
+            builder: (_) => NoticeDetailScreen(noticeId: noticeId),
+          ),
+        );
+      } else {
+        navState.push(
+          MaterialPageRoute(
+            builder: (_) => const NoticeBoardScreen(),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _saveToken(String userId) async {
@@ -223,6 +277,8 @@ class PushNotificationService {
       return;
     }
 
+    final payload = jsonEncode(message.data);
+
     _localNotifications.show(
       message.hashCode,
       title,
@@ -239,7 +295,7 @@ class PushNotificationService {
           enableVibration: true,
         ),
       ),
-      payload: message.data['type']?.toString(),
+      payload: payload,
     );
   }
 }

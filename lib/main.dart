@@ -64,6 +64,8 @@ Future<void> _bootstrapAppServices() async {
   }
 }
 
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
 class UniShareSyncApp extends StatelessWidget {
   const UniShareSyncApp({super.key});
 
@@ -75,6 +77,7 @@ class UniShareSyncApp extends StatelessWidget {
       DeviceOrientation.portraitDown,
     ]);
     return MaterialApp(
+      navigatorKey: appNavigatorKey,
       title: 'UniShareSync',
       debugShowCheckedModeBanner: false,
       // Smooth physics that feel natural on 90/120 Hz displays

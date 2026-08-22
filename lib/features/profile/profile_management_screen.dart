@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unisharesync_mobile_app/data/models/profile_model.dart';
 import 'package:unisharesync_mobile_app/data/models/user_role.dart';
 import 'package:unisharesync_mobile_app/services/profile_service.dart';
@@ -19,10 +20,8 @@ class _ProfileManagementScreenState extends State<ProfileManagementScreen> {
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _fullNameController = TextEditingController();
-  final TextEditingController _departmentController = TextEditingController();
-  final TextEditingController _semesterController = TextEditingController();
-  final TextEditingController _studentIdController = TextEditingController();
   final TextEditingController _designationController = TextEditingController();
+  final TextEditingController _groupController = TextEditingController();
 
   ProfileModel? _profile;
   bool _isLoading = true;
@@ -30,6 +29,25 @@ class _ProfileManagementScreenState extends State<ProfileManagementScreen> {
 
   Uint8List? _selectedImageBytes;
   String? _selectedImageExtension;
+
+  bool _canChangeSemester = true;
+  String? _semesterLockMessage;
+  String? _selectedSemester;
+
+  static const List<String> _semesterOptions = [
+    'Semester 1',
+    'Semester 2',
+    'Semester 3',
+    'Semester 4',
+    'Semester 5',
+    'Semester 6',
+    'Semester 7',
+    'Semester 8',
+    'Semester 9',
+    'Semester 10',
+    'Semester 11',
+    'Semester 12',
+  ];
 
   @override
   void initState() {
@@ -40,10 +58,8 @@ class _ProfileManagementScreenState extends State<ProfileManagementScreen> {
   @override
   void dispose() {
     _fullNameController.dispose();
-    _departmentController.dispose();
-    _semesterController.dispose();
-    _studentIdController.dispose();
     _designationController.dispose();
+    _groupController.dispose();
     super.dispose();
   }
 
@@ -62,10 +78,41 @@ class _ProfileManagementScreenState extends State<ProfileManagementScreen> {
     }
 
     _fullNameController.text = profile.fullName;
-    _departmentController.text = profile.department ?? '';
-    _semesterController.text = profile.semester ?? '';
-    _studentIdController.text = profile.studentId ?? '';
     _designationController.text = profile.designation ?? '';
+
+    if (profile.semester != null && profile.semester!.isNotEmpty) {
+      final sem = profile.semester!.trim();
+      if (_semesterOptions.contains(sem)) {
+        _selectedSemester = sem;
+      } else {
+        final digits = sem.replaceAll(RegExp(r'[^0-9]'), '');
+        if (digits.isNotEmpty) {
+          final matched = 'Semester $digits';
+          _selectedSemester = _semesterOptions.contains(matched) ? matched : sem;
+        } else {
+          _selectedSemester = sem;
+        }
+      }
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final group = prefs.getString('preferred_routine_group') ?? '';
+    _groupController.text = group;
+
+    final lastChangeStr = prefs.getString('last_semester_change_${profile.id}');
+    if (lastChangeStr != null) {
+      final lastChange = DateTime.tryParse(lastChangeStr);
+      if (lastChange != null) {
+        final daysPassed = DateTime.now().difference(lastChange).inDays;
+        if (daysPassed < 180) {
+          final daysRemaining = 180 - daysPassed;
+          final nextDate = lastChange.add(const Duration(days: 180));
+          _canChangeSemester = false;
+          _semesterLockMessage =
+              'Semester can only be changed once every 6 months. Next change available in $daysRemaining days (${nextDate.day}/${nextDate.month}/${nextDate.year}).';
+        }
+      }
+    }
 
     setState(() {
       _profile = profile;
@@ -108,6 +155,17 @@ class _ProfileManagementScreenState extends State<ProfileManagementScreen> {
       return;
     }
 
+    final isSemesterChanged = (profile.semester ?? '').trim() != (_selectedSemester ?? '').trim();
+    if (profile.role == UserRole.student && isSemesterChanged && !_canChangeSemester) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_semesterLockMessage ?? 'Semester can only be changed once every 6 months.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isSaving = true;
     });
@@ -124,15 +182,9 @@ class _ProfileManagementScreenState extends State<ProfileManagementScreen> {
 
       final updatedProfile = profile.copyWith(
         fullName: _fullNameController.text.trim(),
-        department: _departmentController.text.trim().isEmpty
-            ? null
-            : _departmentController.text.trim(),
-        semester: _semesterController.text.trim().isEmpty
-            ? null
-            : _semesterController.text.trim(),
-        studentId: _studentIdController.text.trim().isEmpty
-            ? null
-            : _studentIdController.text.trim(),
+        department: profile.department,
+        semester: profile.role == UserRole.student ? _selectedSemester : null,
+        studentId: profile.studentId,
         designation: _designationController.text.trim().isEmpty
             ? null
             : _designationController.text.trim(),
@@ -140,6 +192,18 @@ class _ProfileManagementScreenState extends State<ProfileManagementScreen> {
       );
 
       await _profileService.updateCurrentProfile(updatedProfile);
+
+      final prefs = await SharedPreferences.getInstance();
+      if (_groupController.text.trim().isNotEmpty) {
+        await prefs.setString('preferred_routine_group', _groupController.text.trim().toUpperCase());
+      }
+      if (profile.role == UserRole.student && isSemesterChanged) {
+        await prefs.setString('last_semester_change_${profile.id}', DateTime.now().toIso8601String());
+        _canChangeSemester = false;
+        final nextDate = DateTime.now().add(const Duration(days: 180));
+        _semesterLockMessage =
+            'Semester can only be changed once every 6 months. Next change available in 180 days (${nextDate.day}/${nextDate.month}/${nextDate.year}).';
+      }
 
       if (!mounted) {
         return;
@@ -179,9 +243,8 @@ class _ProfileManagementScreenState extends State<ProfileManagementScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        centerTitle: false,
         title: const Text(
-          'Profile Management',
+          'Profile Settings',
           style: TextStyle(
             color: Color(0xFF0F172A),
             fontWeight: FontWeight.w800,
@@ -191,15 +254,7 @@ class _ProfileManagementScreenState extends State<ProfileManagementScreen> {
       body: _isLoading
           ? const _ProfileSkeleton()
           : profile == null
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Text(
-                      'No profile found for this account yet. Complete email verification and sign in again.',
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                )
+              ? const Center(child: Text('Profile not available.'))
               : SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
                   child: Form(
@@ -210,42 +265,21 @@ class _ProfileManagementScreenState extends State<ProfileManagementScreen> {
                         Center(
                           child: Stack(
                             children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 4,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.08),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: CircleAvatar(
-                                  radius: 54,
-                                  backgroundColor: const Color(0xFF4F9EFF).withOpacity(0.15),
-                                  backgroundImage: _selectedImageBytes != null
-                                      ? MemoryImage(_selectedImageBytes!)
-                                      : (profile.avatarUrl != null
-                                          ? NetworkImage(profile.avatarUrl!)
-                                          : null) as ImageProvider<Object>?,
-                                  child: _selectedImageBytes == null && profile.avatarUrl == null
-                                      ? Text(
-                                          profile.fullName.isNotEmpty
-                                              ? profile.fullName[0].toUpperCase()
-                                              : 'U',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 26,
-                                            color: Color(0xFF2B5B94),
-                                          ),
-                                        )
-                                      : null,
-                                ),
+                              CircleAvatar(
+                                radius: 46,
+                                backgroundColor: const Color(0xFF4F9EFF).withOpacity(0.16),
+                                backgroundImage: _selectedImageBytes != null
+                                    ? MemoryImage(_selectedImageBytes!)
+                                    : (profile.avatarUrl != null
+                                        ? NetworkImage(profile.avatarUrl!)
+                                        : null) as ImageProvider?,
+                                child: _selectedImageBytes == null && profile.avatarUrl == null
+                                    ? const Icon(
+                                        Icons.person_rounded,
+                                        size: 46,
+                                        color: Color(0xFF4F9EFF),
+                                      )
+                                    : null,
                               ),
                               Positioned.fill(
                                 child: Material(
@@ -253,36 +287,6 @@ class _ProfileManagementScreenState extends State<ProfileManagementScreen> {
                                   child: InkWell(
                                     onTap: _pickPhoto,
                                     customBorder: const CircleBorder(),
-                                    splashColor: const Color(0xFF4F9EFF).withOpacity(0.15),
-                                  ),
-                                ),
-                              ),
-                              Positioned(
-                                bottom: 4,
-                                right: 4,
-                                child: IgnorePointer(
-                                  child: Container(
-                                    padding: const EdgeInsets.all(7),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF4F9EFF),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.white,
-                                        width: 2.5,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.15),
-                                          blurRadius: 6,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                    child: const Icon(
-                                      Icons.camera_alt_rounded,
-                                      color: Colors.white,
-                                      size: 18,
-                                    ),
                                   ),
                                 ),
                               ),
@@ -312,23 +316,118 @@ class _ProfileManagementScreenState extends State<ProfileManagementScreen> {
                           value: profile.role.displayName,
                         ),
                         const SizedBox(height: 12),
-                        _LabeledInput(
-                          controller: _departmentController,
-                          label: 'Department',
-                          hintText: 'Department name',
+                        _ReadOnlyInfoTile(
+                          label: 'Department (Locked)',
+                          value: profile.department?.isNotEmpty == true
+                              ? profile.department!
+                              : 'Not assigned',
                         ),
                         const SizedBox(height: 12),
                         if (profile.role == UserRole.student) ...[
-                          _LabeledInput(
-                            controller: _studentIdController,
-                            label: 'Student ID',
-                            hintText: 'Student ID',
+                          _ReadOnlyInfoTile(
+                            label: 'Student ID (Locked)',
+                            value: profile.studentId?.isNotEmpty == true
+                                ? profile.studentId!
+                                : 'Not assigned',
                           ),
                           const SizedBox(height: 12),
+                          if (!_canChangeSemester) ...[
+                            _ReadOnlyInfoTile(
+                              label: 'Semester (Locked - 6mo Cooldown)',
+                              value: profile.semester ?? 'Not assigned',
+                            ),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade50,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.amber.shade300),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.lock_clock_rounded, size: 16, color: Colors.amber.shade900),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _semesterLockMessage ?? 'Semester can only be changed once every 6 months.',
+                                      style: TextStyle(
+                                        color: Colors.amber.shade900,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ] else ...[
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Semester',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                DropdownButtonFormField<String>(
+                                  value: _semesterOptions.contains(_selectedSemester)
+                                      ? _selectedSemester
+                                      : null,
+                                  decoration: InputDecoration(
+                                    hintText: 'Select your current semester',
+                                    filled: true,
+                                    fillColor: Colors.white.withOpacity(0.82),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: BorderSide(
+                                        color: const Color(0xFF4F9EFF).withOpacity(0.2),
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: BorderSide(
+                                        color: const Color(0xFF4F9EFF).withOpacity(0.2),
+                                      ),
+                                    ),
+                                  ),
+                                  items: _semesterOptions
+                                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                                      .toList(),
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _selectedSemester = val;
+                                    });
+                                  },
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Note: Semester can only be changed once every 6 months.',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade600,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          const SizedBox(height: 12),
                           _LabeledInput(
-                            controller: _semesterController,
-                            label: 'Semester',
-                            hintText: 'Current semester',
+                            controller: _groupController,
+                            label: 'Default Routine Group / Section',
+                            hintText: 'e.g. 10A, 10B, 9A, A, B',
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Your routine scheduler will automatically filter for this group by default.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade600,
+                            ),
                           ),
                         ] else ...[
                           _LabeledInput(
@@ -337,7 +436,7 @@ class _ProfileManagementScreenState extends State<ProfileManagementScreen> {
                             hintText: 'Lecturer / Professor / Admin',
                           ),
                         ],
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 20),
                         _PrimaryButton(
                           onTap: _isSaving ? null : _saveProfile,
                           isLoading: _isSaving,
