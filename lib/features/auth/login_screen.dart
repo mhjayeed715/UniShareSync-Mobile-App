@@ -18,6 +18,8 @@ class SignInScreen extends StatefulWidget {
   State<SignInScreen> createState() => _SignInScreenState();
 }
 
+typedef LoginScreen = SignInScreen;
+
 class _SignInScreenState extends State<SignInScreen> {
   static const String _logoAsset = 'lib/assets/logos/unisharesync.png';
 

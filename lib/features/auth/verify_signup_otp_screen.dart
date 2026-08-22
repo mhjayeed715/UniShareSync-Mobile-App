@@ -194,7 +194,7 @@ class _VerifySignupOtpScreenState extends State<VerifySignupOtpScreen> {
                 onPressed: () {
                   Navigator.of(dialogCtx).pop();
                   Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    MaterialPageRoute(builder: (_) => const SignInScreen()),
                     (route) => false,
                   );
                 },
