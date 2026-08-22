@@ -12,6 +12,7 @@ class ProfileModel {
     this.designation,
     this.avatarUrl,
     this.isActive = true,
+    this.isApproved = true,
   });
 
   final String id;
@@ -24,6 +25,7 @@ class ProfileModel {
   final String? designation;
   final String? avatarUrl;
   final bool isActive;
+  final bool isApproved;
 
   ProfileModel copyWith({
     String? id,
@@ -36,6 +38,7 @@ class ProfileModel {
     String? designation,
     String? avatarUrl,
     bool? isActive,
+    bool? isApproved,
   }) {
     return ProfileModel(
       id: id ?? this.id,
@@ -48,6 +51,7 @@ class ProfileModel {
       designation: designation ?? this.designation,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       isActive: isActive ?? this.isActive,
+      isApproved: isApproved ?? this.isApproved,
     );
   }
 
@@ -63,22 +67,29 @@ class ProfileModel {
       'designation': designation,
       'avatar_url': avatarUrl,
       'is_active': isActive,
+      'is_approved': isApproved,
       'updated_at': DateTime.now().toIso8601String(),
     };
   }
 
   factory ProfileModel.fromMap(Map<String, dynamic> map) {
+    final role = UserRole.fromString(map['role']?.toString());
+    final bool rawIsApproved = map['is_approved'] is bool
+        ? map['is_approved'] as bool
+        : (map['is_approved'] == 'true' || (map['is_approved'] == null && role != UserRole.faculty));
+
     return ProfileModel(
       id: (map['id'] ?? '').toString(),
       email: (map['email'] ?? '').toString(),
       fullName: (map['full_name'] ?? '').toString(),
-      role: UserRole.fromString(map['role']?.toString()),
+      role: role,
       department: map['department']?.toString(),
       studentId: map['student_id']?.toString(),
       semester: map['semester']?.toString(),
       designation: map['designation']?.toString(),
       avatarUrl: map['avatar_url']?.toString(),
       isActive: map['is_active'] as bool? ?? true,
+      isApproved: rawIsApproved,
     );
   }
 }

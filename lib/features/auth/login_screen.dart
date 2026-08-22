@@ -88,6 +88,9 @@ class _SignInScreenState extends State<SignInScreen> {
     if (message.contains('deactivated')) {
       return 'Your account has been deactivated. Please contact an administrator.';
     }
+    if (message.contains('pending') || message.contains('faculty') || message.contains('approval') || message.contains('verification')) {
+      return error.toString().replaceAll('Bad state: ', '').replaceAll('StateError: ', '');
+    }
     // Fallback for demo account errors
     if (message.contains('demo')) {
       return error.toString().replaceAll('Bad state: ', '');

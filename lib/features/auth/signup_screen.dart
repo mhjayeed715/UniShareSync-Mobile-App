@@ -359,6 +359,33 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   });
                                 },
                               ),
+                              if (_role == AccountRole.faculty) ...[
+                                const SizedBox(height: 12),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.shade50,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.amber.shade300),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.admin_panel_settings_outlined, size: 20, color: Colors.amber.shade900),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          'Security Notice: Faculty registrations require administrative verification before login access is granted.',
+                                          style: TextStyle(
+                                            color: Colors.amber.shade900,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                               const SizedBox(height: 18),
                               _AuthInput(
                                 label: 'Full Name',

@@ -93,8 +93,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     ),
     _AdminPanelOption(
       id: 'role_control',
-      title: 'Role Control',
-      subtitle: 'Assign and audit permissions.',
+      title: 'User & Role Control',
+      subtitle: 'Faculty approvals, roles & users.',
       icon: Icons.admin_panel_settings_rounded,
       color: _AdminPalette.roleControlCyan,
     ),

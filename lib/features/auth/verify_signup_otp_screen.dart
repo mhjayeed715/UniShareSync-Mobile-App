@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:unisharesync_mobile_app/features/auth/login_screen.dart';
 import 'package:unisharesync_mobile_app/features/dashboard/role_home_screen.dart';
 import 'package:unisharesync_mobile_app/services/auth_service.dart';
 
@@ -170,8 +171,43 @@ class _VerifySignupOtpScreenState extends State<VerifySignupOtpScreen> {
         return;
       }
 
+      final errorMsg = error.toString().replaceAll('Bad state: ', '').replaceAll('StateError: ', '');
+      if (errorMsg.contains('pending administrator verification') || errorMsg.contains('Faculty account')) {
+        await showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogCtx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.hourglass_top_rounded, color: Colors.orange),
+                SizedBox(width: 8),
+                Text('Faculty Verification', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              ],
+            ),
+            content: const Text(
+              'Your email has been verified successfully!\n\nFaculty registrations require administrative approval before login access is enabled. Our administration will review your credentials shortly.',
+              style: TextStyle(fontSize: 14, height: 1.4),
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () {
+                  Navigator.of(dialogCtx).pop();
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    (route) => false,
+                  );
+                },
+                child: const Text('Go to Login'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('OTP verification failed: $error')),
+        SnackBar(content: Text('OTP verification failed: $errorMsg')),
       );
     } finally {
       if (mounted) {

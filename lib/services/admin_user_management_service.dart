@@ -76,4 +76,12 @@ class AdminUserManagementService {
         .update({'role': newRole.value, 'updated_at': DateTime.now().toIso8601String()})
         .eq('id', userId);
   }
+
+  Future<void> setFacultyApproval(String userId, {required bool approved}) async {
+    await _client.from('profiles').update({
+      'is_approved': approved,
+      'is_active': approved,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', userId);
+  }
 }

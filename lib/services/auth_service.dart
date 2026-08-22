@@ -34,6 +34,7 @@ class SignUpPayload {
       'student_id': studentId,
       'semester': semester,
       'designation': designation,
+      'is_approved': role != UserRole.faculty,
     };
   }
 }
@@ -109,6 +110,11 @@ class AuthService {
     if (profile != null && !profile.isActive) {
       await _client.auth.signOut();
       throw StateError('This account has been deactivated. Please contact an administrator.');
+    }
+
+    if (profile != null && profile.role == UserRole.faculty && !profile.isApproved) {
+      await _client.auth.signOut();
+      throw StateError('Your Faculty account has been registered and is pending administrator verification. You will be able to log in once approved by the SMUCT administration.');
     }
 
     final role = profile?.role ??
@@ -294,6 +300,11 @@ class AuthService {
     if (profile != null && !profile.isActive) {
       await _client.auth.signOut();
       throw StateError('Your account has been deactivated. Please contact an administrator.');
+    }
+
+    if (profile != null && profile.role == UserRole.faculty && !profile.isApproved) {
+      await _client.auth.signOut();
+      throw StateError('Your Faculty account is currently pending administrative verification. An administrator must approve your account before you can log in.');
     }
 
     await _localSessionStore.setSupabaseSessionActive(true);
