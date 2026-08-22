@@ -129,6 +129,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       return const Center(child: Text('Task details not found.', style: TextStyle(color: Color(0xFF0F172A))));
     }
 
+    final task = activeTask;
+
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
       decoration: BoxDecoration(
@@ -185,15 +187,15 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                 children: [
                   Expanded(
                     child: Text(
-                      activeTask.title,
+                      task.title,
                       style: const TextStyle(color: Color(0xFF0F172A), fontFamily: 'Outfit', fontSize: 22, fontWeight: FontWeight.bold),
                     ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.edit, color: Colors.blueAccent),
                     onPressed: () {
-                      _titleController.text = activeTask!.title;
-                      _descController.text = activeTask.description ?? '';
+                      _titleController.text = task.title;
+                      _descController.text = task.description ?? '';
                       setState(() => _isEditing = true);
                     },
                   ),
@@ -204,9 +206,9 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                 ],
               ),
               const SizedBox(height: 8),
-              if (activeTask.description != null && activeTask.description!.isNotEmpty) ...[
+              if (task.description != null && task.description!.isNotEmpty) ...[
                 Text(
-                  activeTask.description!,
+                  task.description!,
                   style: const TextStyle(color: Color(0xFF475569), fontSize: 14),
                 ),
                 const SizedBox(height: 16),
@@ -226,7 +228,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                       ),
                       const SizedBox(height: 4),
                       DropdownButton<String>(
-                        value: activeTask.columnId,
+                        value: task.columnId,
                         isExpanded: true,
                         style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w600, fontSize: 14),
                         underline: const SizedBox(),
@@ -237,11 +239,11 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                           );
                         }).toList(),
                         onChanged: (newColId) async {
-                          if (newColId != null && newColId != activeTask!.columnId) {
+                          if (newColId != null && newColId != task.columnId) {
                             final tasksInNewCol = (await ref.read(kanbanServiceProvider).fetchTasks(widget.projectId)).where((t) => t.columnId == newColId).toList();
                             final newPos = tasksInNewCol.isEmpty ? 1.0 : tasksInNewCol.last.position + 1.0;
                             await ref.read(kanbanServiceProvider).updateTaskPosition(
-                              taskId: activeTask.id,
+                              taskId: task.id,
                               columnId: newColId,
                               position: newPos,
                               projectId: widget.projectId,
@@ -264,7 +266,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                       ),
                       const SizedBox(height: 4),
                       DropdownButton<TaskPriority>(
-                        value: activeTask.priority,
+                        value: task.priority,
                         isExpanded: true,
                         style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w600, fontSize: 14),
                         underline: const SizedBox(),
@@ -275,13 +277,13 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                           );
                         }).toList(),
                         onChanged: (newPriority) async {
-                          if (newPriority != null && newPriority != activeTask!.priority) {
+                          if (newPriority != null && newPriority != task.priority) {
                             await ref.read(kanbanServiceProvider).updateTaskDetails(
-                              taskId: activeTask.id,
-                              title: activeTask.title,
-                              description: activeTask.description,
+                              taskId: task.id,
+                              title: task.title,
+                              description: task.description,
                               priority: newPriority,
-                              dueDate: activeTask.dueDate,
+                              dueDate: task.dueDate,
                               projectId: widget.projectId,
                             );
                             _loadTaskDetails();
@@ -297,12 +299,12 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
 
             // Checklist Section
             _buildSectionHeader('Checklist'),
-            _buildChecklistBuilder(activeTask),
+            _buildChecklistBuilder(task),
             const SizedBox(height: 20),
 
             // Comments Board
             _buildSectionHeader('Comments'),
-            _buildCommentsDeck(activeTask),
+            _buildCommentsDeck(task),
           ],
         ),
       ),
